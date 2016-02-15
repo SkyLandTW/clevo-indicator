@@ -27,9 +27,74 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.compiler.exe.debug.315996596" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.exe.debug">
 								<option defaultValue="gnu.c.optimization.level.none" id="gnu.c.compiler.exe.debug.option.optimization.level.1625806002" name="Optimization Level" superClass="gnu.c.compiler.exe.debug.option.optimization.level" valueType="enumerated"/>
 								<option id="gnu.c.compiler.exe.debug.option.debugging.level.603662942" name="Debug Level" superClass="gnu.c.compiler.exe.debug.option.debugging.level" value="gnu.c.debugging.level.max" valueType="enumerated"/>
+								<option id="gnu.c.compiler.option.include.paths.1515721365" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="/usr/include/libappindicator3-0.1"/>
+									<listOptionValue builtIn="false" value="/usr/include/libdbusmenu-glib-0.4"/>
+									<listOptionValue builtIn="false" value="/usr/include/gtk-3.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/at-spi2-atk/2.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/at-spi-2.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/dbus-1.0"/>
+									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/dbus-1.0/include"/>
+									<listOptionValue builtIn="false" value="/usr/include/gio-unix-2.0/"/>
+									<listOptionValue builtIn="false" value="/usr/include/mirclient"/>
+									<listOptionValue builtIn="false" value="/usr/include/mircommon"/>
+									<listOptionValue builtIn="false" value="/usr/include/cairo"/>
+									<listOptionValue builtIn="false" value="/usr/include/pango-1.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/harfbuzz"/>
+									<listOptionValue builtIn="false" value="/usr/include/atk-1.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/pixman-1"/>
+									<listOptionValue builtIn="false" value="/usr/include/freetype2"/>
+									<listOptionValue builtIn="false" value="/usr/include/libpng12"/>
+									<listOptionValue builtIn="false" value="/usr/include/gdk-pixbuf-2.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
+									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+									<listOptionValue builtIn="false" value="/usr/include/libindicator3-0.4"/>
+								</option>
+								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1267480048" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
+								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.884563312" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.exe.debug.5131540" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.debug">
+								<option id="gnu.c.link.option.paths.1308621345" name="Library search path (-L)" superClass="gnu.c.link.option.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="../"/>
+								</option>
+								<option id="gnu.c.link.option.libs.1452810217" name="Libraries (-l)" superClass="gnu.c.link.option.libs" valueType="libs">
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="appindicator3"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="dbusmenu-glib"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gtk-3"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gdk-3"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="pangocairo-1.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="pango-1.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="atk-1.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="cairo-gobject"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="cairo"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gdk_pixbuf-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gio-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gobject-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="glib-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="indicator3"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="indicator3"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gtk-3"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gdk-3"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="pangocairo-1.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="pango-1.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="atk-1.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="cairo-gobject"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="cairo"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gdk_pixbuf-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gio-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gobject-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="glib-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="appindicator"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="dbusmenu-glib"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gtk-x11-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gdk-x11-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="pangoft2-1.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="fontconfig"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="freetype"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="appindicator3"/>
+								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.linker.input.1922632569" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -47,7 +112,51 @@
 					</sourceEntries>
 				</configuration>
 			</storageModule>
-			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+			<storageModule moduleId="org.eclipse.cdt.core.externalSettings">
+				<externalSettings containerId="org.eclipse.cdt.managedbuilder.pkgconfig.extSettings" factoryId="org.eclipse.cdt.core.extension.container.factory">
+					<externalSetting contentTypes="org.eclipse.cdt.managedbuilder.core.compiledObjectFile">
+						<entry flags="RESOLVED" kind="libraryPath" name=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="appindicator3" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="dbusmenu-glib" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="gtk-3" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="gdk-3" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="pangocairo-1.0" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="pango-1.0" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="atk-1.0" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="cairo-gobject" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="cairo" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="gdk_pixbuf-2.0" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="gio-2.0" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="gobject-2.0" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="glib-2.0" srcPrefixMapping="" srcRootPath=""/>
+						<entry flags="UNDEFINED" kind="libraryFile" name="indicator3" srcPrefixMapping="" srcRootPath=""/>
+					</externalSetting>
+					<externalSetting contentTypes="org.eclipse.cdt.core.cSource:org.eclipse.cdt.core.cxxSource">
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/libappindicator3-0.1"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/libdbusmenu-glib-0.4"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/gtk-3.0"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/at-spi2-atk/2.0"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/at-spi-2.0"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/dbus-1.0"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/lib/x86_64-linux-gnu/dbus-1.0/include"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/gio-unix-2.0/"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/mirclient"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/mircommon"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/cairo"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/pango-1.0"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/harfbuzz"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/atk-1.0"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/pixman-1"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/freetype2"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/libpng12"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/gdk-pixbuf-2.0"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/glib-2.0"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/libindicator3-0.4"/>
+					</externalSetting>
+				</externalSettings>
+			</storageModule>
+			<storageModule adwaita-icon-theme="false" appindicator-0.1="false" appindicator3-0.1="true" aspnetwebstack="false" atk="false" atk-bridge-2.0="false" atspi-2="false" banshee-collection-indexer="false" banshee-core="false" banshee-hyena="false" banshee-hyena-data-sqlite="false" banshee-hyena-gui="false" banshee-lastfm="false" banshee-lastfm-gui="false" banshee-mono-media="false" banshee-musicbrainz="false" banshee-nowplaying="false" banshee-services="false" banshee-thickclient="false" banshee-webbrowser="false" bash-completion="false" cairo="false" cairo-fc="false" cairo-ft="false" cairo-gobject="false" cairo-pdf="false" cairo-png="false" cairo-ps="false" cairo-script="false" cairo-svg="false" cairo-tee="false" cairo-xcb="false" cairo-xcb-shm="false" cairo-xlib="false" cairo-xlib-xrender="false" cecil="false" compizconfig-python="false" compositeproto="false" damageproto="false" dbus-1="false" dbus-glib-1="false" dbus-python="false" dbusmenu-glib-0.4="false" dotnet="false" dotnet35="false" dri2proto="false" egl="false" epoxy="false" expat="false" fixesproto="false" fontconfig="false" fontutil="false" freetype2="false" gdk-2.0="false" gdk-3.0="false" gdk-broadway-3.0="false" gdk-mir-3.0="false" gdk-pixbuf-2.0="false" gdk-pixbuf-xlib-2.0="false" gdk-wayland-3.0="false" gdk-x11-2.0="false" gdk-x11-3.0="false" gio-2.0="false" gio-unix-2.0="false" glade-sharp-2.0="false" glib-2.0="false" glib-sharp-2.0="false" glproto="false" gmodule-2.0="false" gmodule-export-2.0="false" gmodule-no-export-2.0="false" gnome-icon-theme="false" gobject-2.0="false" gthread-2.0="false" gtk-dotnet-2.0="false" gtk-sharp-2.0="false" gtkplus-2.0="false" gtkplus-3.0="false" gtkplus-broadway-3.0="false" gtkplus-mir-3.0="false" gtkplus-unix-print-2.0="false" gtkplus-unix-print-3.0="false" gtkplus-wayland-3.0="false" gtkplus-x11-2.0="false" gtkplus-x11-3.0="false" harfbuzz="false" harfbuzz-gobject="false" harfbuzz-icu="false" ibus-table="false" ice="false" icu-i18n="false" icu-io="false" icu-le="false" icu-lx="false" icu-uc="false" indicator-0.4="false" indicator3-0.4="true" inputproto="false" intel-gen4asm="false" iso-codes="false" javascriptcoregtk-3.0="false" kbproto="false" libcrypto="false" libdrm="false" libdrm_amdgpu="false" libdrm_intel="false" libdrm_nouveau="false" libdrm_radeon="false" libgdiplus="false" libpcre="false" libpcre16="false" libpcre32="false" libpcrecpp="false" libpcreposix="false" libpng="false" libpng12="false" libquvi-scripts="false" libsoup-2.4="false" libssl="false" libxml-2.0="false" mirclient="false" mobile-broadband-provider-info="false" moduleId="packages" mono="false" mono-2="false" mono-cairo="false" mono-lineeditor="false" mono-nunit="false" mono-options="false" mono.web="false" monodevelop="false" monodevelop-core-addins="false" monodoc="false" nautilus-python="false" nunit="false" openssl="false" pango="false" pangocairo="false" pangoft2="false" pangoxft="false" pixman-1="false" pm-utils="false" poppler-data="false" protobuf="false" protobuf-lite="false" pthread-stubs="false" randrproto="false" reactive="false" recordproto="false" renderproto="false" shared-mime-info="false" sm="false" snort="false" snort_output="false" snort_preproc="false" spice-client-glib-2.0="false" spice-client-gtk-3.0="false" spice-controller="false" spice-protocol="false" system.web.extensions.design_1.0="false" system.web.extensions_1.0="false" system.web.mvc="false" system.web.mvc2="false" system.web.mvc3="false" systemd="false" udev="false" usbutils="false" valgrind="false" wayland-client="false" wayland-cursor="false" wayland-egl="false" wayland-scanner="false" wayland-server="false" wcf="false" webkit2gtk-3.0="false" webkitgtk-3.0="false" x11="false" x11-xcb="false" xau="false" xbitmaps="false" xbuild12="false" xcb="false" xcb-dri2="false" xcb-dri3="false" xcb-glx="false" xcb-present="false" xcb-randr="false" xcb-render="false" xcb-shape="false" xcb-shm="false" xcb-sync="false" xcb-xfixes="false" xcomposite="false" xcursor="false" xdamage="false" xdmcp="false" xext="false" xextproto="false" xf86vidmodeproto="false" xfixes="false" xft="false" xi="false" xinerama="false" xineramaproto="false" xkbcommon="false" xkbcomp="false" xkeyboard-config="false" xorg-sgml-doctools="false" xorg-wacom="false" xproto="false" xrandr="false" xrender="false" xshmfence="false" xt="false" xtrans="false" xtst="false" xxf86vm="false" yelp-xsl="false" zlib="false"/>
 		</cconfiguration>
 	</storageModule>
 	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
@@ -68,4 +177,5 @@
 	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets">
 		<buildTargets/>
 	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 </cproject>

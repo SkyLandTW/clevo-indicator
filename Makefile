@@ -17,10 +17,14 @@ LDFLAGS += `pkg-config --libs appindicator3-0.1`
 
 all: $(TARGET)
 
+test: $(TARGET)
+	@sudo chown root $(TARGET)
+	@sudo chmod u+s $(TARGET)
+
 $(TARGET): $(OBJ)
 	@mkdir -p bin
 	@echo $(TARGET) from $(OBJ)
-	@$(CC) $(OBJ) -o $(TARGET) $(LDFLAGS)
+	@$(CC) $(OBJ) -o $(TARGET) $(LDFLAGS) -pthread
 
 clean:
 	rm $(OBJ) $(TARGET)
