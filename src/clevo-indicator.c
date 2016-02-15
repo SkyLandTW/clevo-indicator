@@ -20,14 +20,16 @@
  ============================================================================
  */
 
-#include <pthread.h>
+#include <errno.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/fsuid.h>
 #include <sys/io.h>
+#include <sys/mman.h>
 #include <sys/syscall.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <libappindicator/app-indicator.h>
@@ -41,11 +43,13 @@
 
 static int init_ec(void);
 static int check_value(const char* arg);
-static void* main_fan_worker(void* arg);
+static int main_fan_worker(void);
 static void main_indicator(int argc, char** argv);
+static void main_worker_exit(int signum);
 static gboolean main_update_ui(gpointer user_data);
 static int main_dump_fan_config(void);
 static int main_test_fan_config(int duty_percentage);
+static void menuitem_quit(gchar* command);
 static int read_cpu_temp(void);
 static int read_fan_duty(void);
 static int read_fan_rpms(void);
@@ -55,24 +59,23 @@ static uint8_t read_ec(const uint32_t port);
 static int do_ec(const uint32_t cmd, const uint32_t port, const uint8_t value);
 
 static AppIndicator* indicator;
-static int signal_exit = 0;
-static int shared_cpu_temp = 0;
-static int shared_fan_duty = 0;
-static int shared_fan_rpms = 0;
+
+struct
+{
+	volatile int exit;
+	volatile int cpu_temp;
+	volatile int fan_duty;
+	volatile int fan_rpms;
+}*share_info;
 
 int main(int argc, char* argv[])
 {
 	printf("Simple fan control utility for Clevo laptops\n");
 	if (init_ec() != EXIT_SUCCESS)
 	{
-		printf("ioperm() failed!\n");
+		printf("unable to control EC: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
-	printf("uid=%d, euid=%d\n", getuid(), geteuid());
-	int uid = getuid();
-	// setuid(uid);
-	syscall(SYS_setuid, uid);
-	printf("env: %s\n", getenv("HOME"));
 	if (argc <= 1 || check_value(argv[1]) != 0)
 	{
 		char* display = getenv("DISPLAY");
@@ -82,11 +85,31 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			pthread_t tid;
-			pthread_create(&tid, NULL, &main_fan_worker, NULL);
-			main_indicator(argc, argv);
-			__atomic_store_n(&signal_exit, 1, __ATOMIC_SEQ_CST);
-			pthread_join(tid, NULL);
+			void* shm = mmap(NULL, 4096, PROT_READ | PROT_WRITE,
+					MAP_ANON | MAP_SHARED, -1, 0);
+			share_info = shm;
+			share_info->exit = 0;
+			share_info->cpu_temp = 0;
+			share_info->fan_duty = 0;
+			share_info->fan_rpms = 0;
+			signal(SIGCHLD, &main_worker_exit);
+			pid_t worker_pid = fork();
+			if (worker_pid == 0)
+			{
+				signal(SIGCHLD, SIG_DFL);
+				return main_fan_worker();
+			}
+			else if (worker_pid > 0)
+			{
+				main_indicator(argc, argv);
+				share_info->exit = 1;
+				waitpid(worker_pid, NULL, 0);
+			}
+			else
+			{
+				printf("unable to create worker: %s\n", strerror(errno));
+				return EXIT_FAILURE;
+			}
 		}
 	}
 	else
@@ -124,33 +147,37 @@ static int check_value(const char* arg)
 		return EXIT_FAILURE;
 }
 
-static void* main_fan_worker(void* arg)
+static int main_fan_worker(void)
 {
-	while (__atomic_load_n(&signal_exit, __ATOMIC_SEQ_CST) == 0)
+	setuid(0);
+	system("modprobe ec_sys");
+	if (access("/sys/kernel/debug/ec/ec0/io", R_OK) != EXIT_SUCCESS)
 	{
-		__atomic_store_n(&shared_cpu_temp, read_cpu_temp(), __ATOMIC_SEQ_CST);
-		__atomic_store_n(&shared_fan_duty, read_fan_duty(), __ATOMIC_SEQ_CST);
-		__atomic_store_n(&shared_fan_rpms, read_fan_rpms(), __ATOMIC_SEQ_CST);
+		printf("unable to read EC from sysfs: %s\n", strerror(errno));
+		exit (EXIT_FAILURE);
+	}
+	while (share_info->exit == 0)
+	{
+		share_info->cpu_temp = read_cpu_temp();
+		share_info->fan_duty = read_fan_duty();
+		share_info->fan_rpms = read_fan_rpms();
 		sleep(1);
 	}
 	printf("worker quit\n");
-	return NULL;
-}
-
-static void menuitem_response(gchar* wtf)
-{
-	printf("click on quit\n");
-	gtk_main_quit();
+	return EXIT_SUCCESS;
 }
 
 static void main_indicator(int argc, char** argv)
 {
 	printf("Indicator...\n");
+	int desktop_uid = getuid();
+	setuid(desktop_uid);
+	//
 	gtk_init(&argc, &argv);
 	//
 	GtkWidget* quit_item = gtk_menu_item_new_with_label("Quit");
-	g_signal_connect_swapped(quit_item, "activate",
-			G_CALLBACK(menuitem_response), (gpointer) "file.open");
+	g_signal_connect_swapped(quit_item, "activate", G_CALLBACK(menuitem_quit),
+			(gpointer) "file.open");
 	GtkWidget* indicator_menu = gtk_menu_new();
 	gtk_menu_shell_append(GTK_MENU_SHELL(indicator_menu), quit_item);
 	gtk_widget_show_all(indicator_menu);
@@ -167,14 +194,20 @@ static void main_indicator(int argc, char** argv)
 	app_indicator_set_menu(indicator, GTK_MENU(indicator_menu));
 	g_timeout_add(500, &main_update_ui, NULL);
 	gtk_main();
-	printf("quit\n");
+	printf("quit UI\n");
+}
+
+static void main_worker_exit(int signum)
+{
+	printf("worker exit\n");
+	exit (EXIT_SUCCESS);
 }
 
 static gboolean main_update_ui(gpointer user_data)
 {
-	int cpu_temp = __atomic_load_n(&shared_cpu_temp, __ATOMIC_SEQ_CST);
-	int fan_duty = __atomic_load_n(&shared_fan_duty, __ATOMIC_SEQ_CST);
-	int fan_rpms = __atomic_load_n(&shared_fan_rpms, __ATOMIC_SEQ_CST);
+	int cpu_temp = __atomic_load_n(&share_info->cpu_temp, __ATOMIC_SEQ_CST);
+	int fan_duty = __atomic_load_n(&share_info->fan_duty, __ATOMIC_SEQ_CST);
+	int fan_rpms = __atomic_load_n(&share_info->fan_rpms, __ATOMIC_SEQ_CST);
 	char label[256];
 	sprintf(label, "%d ℃", cpu_temp);
 	app_indicator_set_label(indicator, label, "XXX");
@@ -196,6 +229,12 @@ static int main_test_fan_config(int duty_percentage)
 	write_fan_duty(duty_percentage);
 	main_dump_fan_config();
 	return EXIT_SUCCESS;
+}
+
+static void menuitem_quit(gchar* command)
+{
+	printf("click on quit\n");
+	gtk_main_quit();
 }
 
 static int read_cpu_temp(void)
