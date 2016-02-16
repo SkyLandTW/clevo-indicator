@@ -21,6 +21,7 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -41,6 +42,12 @@
 #define OBF 0
 #define EC_SC_READ_CMD 0x80
 
+#define EC_REG_SIZE 0x100
+#define EC_REG_CPU_TEMP 0x07
+#define EC_REG_FAN_DUTY 0xCE
+#define EC_REG_FAN_RPMS_HI 0xD0
+#define EC_REG_FAN_RPMS_LO 0xD1
+
 static int init_ec(void);
 static int check_value(const char* arg);
 static int main_fan_worker(void);
@@ -50,9 +57,11 @@ static gboolean main_update_ui(gpointer user_data);
 static int main_dump_fan_config(void);
 static int main_test_fan_config(int duty_percentage);
 static void menuitem_quit(gchar* command);
-static int read_cpu_temp(void);
-static int read_fan_duty(void);
-static int read_fan_rpms(void);
+static int query_cpu_temp(void);
+static int query_fan_duty(void);
+static int query_fan_rpms(void);
+static int calculate_fan_duty(int raw_duty);
+static int calculate_fan_rpms(int raw_rpm_high, int raw_rpm_low);
 static int write_fan_duty(int duty_percentage);
 static int wait_ec(const uint32_t port, const uint32_t flag, const char value);
 static uint8_t read_ec(const uint32_t port);
@@ -151,16 +160,33 @@ static int main_fan_worker(void)
 {
 	setuid(0);
 	system("modprobe ec_sys");
-	if (access("/sys/kernel/debug/ec/ec0/io", R_OK) != EXIT_SUCCESS)
-	{
-		printf("unable to read EC from sysfs: %s\n", strerror(errno));
-		exit (EXIT_FAILURE);
-	}
 	while (share_info->exit == 0)
 	{
-		share_info->cpu_temp = read_cpu_temp();
-		share_info->fan_duty = read_fan_duty();
-		share_info->fan_rpms = read_fan_rpms();
+		int io_fd = open("/sys/kernel/debug/ec/ec0/io", O_RDONLY, 0);
+		if (io_fd < 0)
+		{
+			printf("unable to read EC from sysfs: %s\n", strerror(errno));
+			exit (EXIT_FAILURE);
+		}
+		unsigned char buf[EC_REG_SIZE];
+		ssize_t len = read(io_fd, buf, EC_REG_SIZE);
+		switch (len)
+		{
+		case -1:
+			printf("unable to read EC from sysfs: %s\n", strerror(errno));
+			break;
+		case 0x100:
+			share_info->cpu_temp = buf[EC_REG_CPU_TEMP];
+			share_info->fan_duty = calculate_fan_duty(buf[EC_REG_FAN_DUTY]);
+			share_info->fan_rpms = calculate_fan_rpms(buf[EC_REG_FAN_RPMS_HI],
+					buf[EC_REG_FAN_RPMS_LO]);
+			printf("temp=%d, duty=%d, rpms=%d\n", share_info->cpu_temp,
+					share_info->fan_duty, share_info->fan_rpms);
+			break;
+		default:
+			printf("wrong EC size from sysfs: %ld\n", len);
+		}
+		close(io_fd);
 		sleep(1);
 	}
 	printf("worker quit\n");
@@ -205,11 +231,8 @@ static void main_worker_exit(int signum)
 
 static gboolean main_update_ui(gpointer user_data)
 {
-	int cpu_temp = __atomic_load_n(&share_info->cpu_temp, __ATOMIC_SEQ_CST);
-	int fan_duty = __atomic_load_n(&share_info->fan_duty, __ATOMIC_SEQ_CST);
-	int fan_rpms = __atomic_load_n(&share_info->fan_rpms, __ATOMIC_SEQ_CST);
 	char label[256];
-	sprintf(label, "%d ℃", cpu_temp);
+	sprintf(label, "%d ℃", share_info->cpu_temp);
 	app_indicator_set_label(indicator, label, "XXX");
 	return G_SOURCE_CONTINUE;
 }
@@ -217,9 +240,9 @@ static gboolean main_update_ui(gpointer user_data)
 static int main_dump_fan_config(void)
 {
 	printf("Dump FAN\n");
-	printf("FAN Duty: %d%%\n", read_fan_duty());
-	printf("FAN RPMs: %d RPM\n", read_fan_rpms());
-	printf("CPU Temp: %d°C\n", read_cpu_temp());
+	printf("FAN Duty: %d%%\n", query_fan_duty());
+	printf("FAN RPMs: %d RPM\n", query_fan_rpms());
+	printf("CPU Temp: %d°C\n", query_cpu_temp());
 	return EXIT_SUCCESS;
 }
 
@@ -237,21 +260,32 @@ static void menuitem_quit(gchar* command)
 	gtk_main_quit();
 }
 
-static int read_cpu_temp(void)
+static int query_cpu_temp(void)
 {
-	return read_ec(0x07);
+	return read_ec(EC_REG_CPU_TEMP);
 }
 
-static int read_fan_duty(void)
+static int query_fan_duty(void)
 {
-	int raw_duty = read_ec(0xCE);
-	int val_duty = (int) ((double) raw_duty / 255.0 * 100.0);
-	return val_duty;
+	int raw_duty = read_ec(EC_REG_FAN_DUTY);
+	return calculate_fan_duty(raw_duty);
 }
 
-static int read_fan_rpms(void)
+static int query_fan_rpms(void)
 {
-	int raw_rpm = (read_ec(0xD0) << 8) + (read_ec(0xD1));
+	int raw_rpm_hi = read_ec(EC_REG_FAN_RPMS_HI);
+	int raw_rpm_lo = read_ec(EC_REG_FAN_RPMS_LO);
+	return calculate_fan_rpms(raw_rpm_hi, raw_rpm_lo);
+}
+
+static int calculate_fan_duty(int raw_duty)
+{
+	return (int) ((double) raw_duty / 255.0 * 100.0);
+}
+
+static int calculate_fan_rpms(int raw_rpm_high, int raw_rpm_low)
+{
+	int raw_rpm = (raw_rpm_high << 8) + raw_rpm_low;
 	return raw_rpm > 0 ? (2156220 / raw_rpm) : 0;
 }
 

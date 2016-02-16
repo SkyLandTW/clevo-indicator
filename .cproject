@@ -50,7 +50,7 @@
 									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/libindicator3-0.4"/>
 								</option>
-								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1267480048" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
+								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1267480048" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.884563312" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
