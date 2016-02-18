@@ -11,7 +11,7 @@
  ============================================================================
 
  TEST:
- gcc clevo-indicator.c -o clevo-indicator `pkg-config --cflags --libs appindicator3-0.1` -pthread
+ gcc clevo-indicator.c -o clevo-indicator `pkg-config --cflags --libs appindicator3-0.1` -lm
  sudo chown root clevo-indicator
  sudo chmod u+s clevo-indicator
 
@@ -22,6 +22,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <math.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -48,6 +49,8 @@
 #define EC_REG_FAN_RPMS_HI 0xD0
 #define EC_REG_FAN_RPMS_LO 0xD1
 
+#define MAX_FAN_RPM 4400.0
+
 static int init_ec(void);
 static int check_value(const char* arg);
 static int main_fan_worker(void);
@@ -56,6 +59,7 @@ static void main_worker_exit(int signum);
 static gboolean main_update_ui(gpointer user_data);
 static int main_dump_fan_config(void);
 static int main_test_fan_config(int duty_percentage);
+static void menuitem_set_fan(long fan_duty);
 static void menuitem_quit(gchar* command);
 static int query_cpu_temp(void);
 static int query_fan_duty(void);
@@ -71,10 +75,30 @@ static AppIndicator* indicator;
 
 struct
 {
+	char label[256];
+	GCallback callback;
+	gpointer cmd;
+
+} menu_item_initializers[6] =
+{
+{ "Set FAN to  60%", G_CALLBACK(menuitem_set_fan), (gpointer) 60 },
+{ "Set FAN to  70%", G_CALLBACK(menuitem_set_fan), (gpointer) 70 },
+{ "Set FAN to  80%", G_CALLBACK(menuitem_set_fan), (gpointer) 80 },
+{ "Set FAN to  90%", G_CALLBACK(menuitem_set_fan), (gpointer) 90 },
+{ "Set FAN to 100%", G_CALLBACK(menuitem_set_fan), (gpointer) 100 },
+{ "Quit", G_CALLBACK(menuitem_quit), NULL } };
+
+static int menu_item_count = (sizeof(menu_item_initializers)
+		/ sizeof(menu_item_initializers[0]));
+
+struct
+{
 	volatile int exit;
 	volatile int cpu_temp;
 	volatile int fan_duty;
 	volatile int fan_rpms;
+	volatile int manual_next_fan_duty;
+	volatile int manual_prev_fan_duty;
 }*share_info;
 
 int main(int argc, char* argv[])
@@ -101,6 +125,8 @@ int main(int argc, char* argv[])
 			share_info->cpu_temp = 0;
 			share_info->fan_duty = 0;
 			share_info->fan_rpms = 0;
+			share_info->manual_next_fan_duty = 0;
+			share_info->manual_prev_fan_duty = 0;
 			signal(SIGCHLD, &main_worker_exit);
 			pid_t worker_pid = fork();
 			if (worker_pid == 0)
@@ -162,6 +188,15 @@ static int main_fan_worker(void)
 	system("modprobe ec_sys");
 	while (share_info->exit == 0)
 	{
+		// write
+		int new_fan_duty = share_info->manual_next_fan_duty;
+		if (new_fan_duty != 0
+				&& new_fan_duty != share_info->manual_prev_fan_duty)
+		{
+			write_fan_duty(new_fan_duty);
+			share_info->manual_prev_fan_duty = new_fan_duty;
+		}
+		// read
 		int io_fd = open("/sys/kernel/debug/ec/ec0/io", O_RDONLY, 0);
 		if (io_fd < 0)
 		{
@@ -180,14 +215,17 @@ static int main_fan_worker(void)
 			share_info->fan_duty = calculate_fan_duty(buf[EC_REG_FAN_DUTY]);
 			share_info->fan_rpms = calculate_fan_rpms(buf[EC_REG_FAN_RPMS_HI],
 					buf[EC_REG_FAN_RPMS_LO]);
-			printf("temp=%d, duty=%d, rpms=%d\n", share_info->cpu_temp,
-					share_info->fan_duty, share_info->fan_rpms);
+			/*
+			 printf("temp=%d, duty=%d, rpms=%d\n", share_info->cpu_temp,
+			 share_info->fan_duty, share_info->fan_rpms);
+			 */
 			break;
 		default:
 			printf("wrong EC size from sysfs: %ld\n", len);
 		}
 		close(io_fd);
-		sleep(1);
+		//
+		usleep(500);
 	}
 	printf("worker quit\n");
 	return EXIT_SUCCESS;
@@ -201,21 +239,24 @@ static void main_indicator(int argc, char** argv)
 	//
 	gtk_init(&argc, &argv);
 	//
-	GtkWidget* quit_item = gtk_menu_item_new_with_label("Quit");
-	g_signal_connect_swapped(quit_item, "activate", G_CALLBACK(menuitem_quit),
-			(gpointer) "file.open");
 	GtkWidget* indicator_menu = gtk_menu_new();
-	gtk_menu_shell_append(GTK_MENU_SHELL(indicator_menu), quit_item);
+	for (int i = 0; i < menu_item_count; i++)
+	{
+		GtkWidget* item = gtk_menu_item_new_with_label(
+				menu_item_initializers[i].label);
+		g_signal_connect_swapped(item, "activate",
+				G_CALLBACK(menu_item_initializers[i].callback),
+				menu_item_initializers[i].cmd);
+		gtk_menu_shell_append(GTK_MENU_SHELL(indicator_menu), item);
+	}
 	gtk_widget_show_all(indicator_menu);
 	//
-	indicator = app_indicator_new("clevo-indicator", "go-jump",
+	indicator = app_indicator_new("clevo-indicator", "brasero",
 			APP_INDICATOR_CATEGORY_HARDWARE);
 	g_assert(IS_APP_INDICATOR(indicator));
-	app_indicator_set_label(indicator, "Hello", "XX");
-	app_indicator_set_attention_icon(indicator, "indicator-messages-new");
+	app_indicator_set_label(indicator, "Init..", "XX");
 	app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ATTENTION);
 	app_indicator_set_ordering_index(indicator, -2);
-	app_indicator_set_icon(indicator, "go-jump");
 	app_indicator_set_title(indicator, "Clevo");
 	app_indicator_set_menu(indicator, GTK_MENU(indicator_menu));
 	g_timeout_add(500, &main_update_ui, NULL);
@@ -234,6 +275,11 @@ static gboolean main_update_ui(gpointer user_data)
 	char label[256];
 	sprintf(label, "%d ℃", share_info->cpu_temp);
 	app_indicator_set_label(indicator, label, "XXX");
+	char icon_name[256];
+	double load = ((double) share_info->fan_rpms) / MAX_FAN_RPM * 100.0;
+	double load_r = round(load / 5.0) * 5.0;
+	sprintf(icon_name, "brasero-disc-%02d", (int) load_r);
+	app_indicator_set_icon(indicator, icon_name);
 	return G_SOURCE_CONTINUE;
 }
 
@@ -252,6 +298,13 @@ static int main_test_fan_config(int duty_percentage)
 	write_fan_duty(duty_percentage);
 	main_dump_fan_config();
 	return EXIT_SUCCESS;
+}
+
+static void menuitem_set_fan(long fan_duty)
+{
+	int fan_duty_val = (int) fan_duty;
+	printf("click on fan duty: %d\n", fan_duty_val);
+	share_info->manual_next_fan_duty = fan_duty_val;
 }
 
 static void menuitem_quit(gchar* command)
@@ -291,6 +344,11 @@ static int calculate_fan_rpms(int raw_rpm_high, int raw_rpm_low)
 
 static int write_fan_duty(int duty_percentage)
 {
+	if (duty_percentage < 60 || duty_percentage > 100)
+	{
+		printf("Wrong fan duty to write: %d\n", duty_percentage);
+		return EXIT_FAILURE;
+	}
 	double v_d = ((double) duty_percentage) / 100.0 * 255.0;
 	int v_i = (int) v_d;
 	return do_ec(0x99, 0x01, v_i);

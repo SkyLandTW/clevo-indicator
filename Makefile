@@ -24,7 +24,7 @@ test: $(TARGET)
 $(TARGET): $(OBJ)
 	@mkdir -p bin
 	@echo $(TARGET) from $(OBJ)
-	@$(CC) $(OBJ) -o $(TARGET) $(LDFLAGS) -pthread
+	@$(CC) $(OBJ) -o $(TARGET) $(LDFLAGS) -lm
 
 clean:
 	rm $(OBJ) $(TARGET)
