@@ -18,6 +18,11 @@
  Run as effective uid = root, but uid = desktop user (in order to use indicator).
 
  ============================================================================
+ Auto fan control algorithm:
+
+ The algorithm is to replace
+
+ ============================================================================
  */
 
 #include <errno.h>
@@ -43,8 +48,15 @@
 #define OBF 0
 #define EC_SC_READ_CMD 0x80
 
+/* EC registers can be read by EC_SC_READ_CMD or /sys/kernel/debug/ec/ec0/io:
+ *
+ * 1. modprobe ec_sys
+ * 2. od -Ax -t x1 /sys/kernel/debug/ec/ec0/io
+ */
+
 #define EC_REG_SIZE 0x100
 #define EC_REG_CPU_TEMP 0x07
+#define EC_REG_GPU_TEMP 0xCD
 #define EC_REG_FAN_DUTY 0xCE
 #define EC_REG_FAN_RPMS_HI 0xD0
 #define EC_REG_FAN_RPMS_LO 0xD1
@@ -56,20 +68,22 @@ typedef enum
 	NA = 0, AUTO = 1, MANUAL = 2
 } MenuItemType;
 
-static int main_check_arg(const char* arg);
 static void main_init_share(void);
 static int main_ec_worker(void);
 static void main_ui_worker(int argc, char** argv);
-static void main_child_signal(int signum);
+static void main_on_sigchld(int signum);
+static void main_on_sigterm(int signum);
 static int main_dump_fan(void);
 static int main_test_fan(int duty_percentage);
 static gboolean ui_update(gpointer user_data);
 static void ui_command_set_fan(long fan_duty);
 static void ui_command_quit(gchar* command);
 static void ui_toggle_menuitems(int fan_duty);
+static void ec_on_sigterm(int signum);
 static int ec_init(void);
 static int ec_auto_duty_adjust(void);
 static int ec_query_cpu_temp(void);
+static int ec_query_gpu_temp(void);
 static int ec_query_fan_duty(void);
 static int ec_query_fan_rpms(void);
 static int ec_write_fan_duty(int duty_percentage);
@@ -80,8 +94,10 @@ static int ec_io_do(const uint32_t cmd, const uint32_t port,
 		const uint8_t value);
 static int calculate_fan_duty(int raw_duty);
 static int calculate_fan_rpms(int raw_rpm_high, int raw_rpm_low);
+static void get_time_string(char* buffer, size_t max, const char* format);
+static void signal_term(__sighandler_t handler);
 
-static AppIndicator* indicator;
+static AppIndicator* indicator = NULL;
 
 struct
 {
@@ -109,13 +125,14 @@ struct
 {
 	volatile int exit;
 	volatile int cpu_temp;
+	volatile int gpu_temp;
 	volatile int fan_duty;
 	volatile int fan_rpms;
 	volatile int auto_duty;
 	volatile int auto_duty_val;
 	volatile int manual_next_fan_duty;
 	volatile int manual_prev_fan_duty;
-}*share_info;
+}*share_info = NULL;
 
 int main(int argc, char* argv[])
 {
@@ -125,7 +142,7 @@ int main(int argc, char* argv[])
 		printf("unable to control EC: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
-	if (argc <= 1 || main_check_arg(argv[1]) != 0)
+	if (argc <= 1)
 	{
 		char* display = getenv("DISPLAY");
 		if (display == NULL || strlen(display) == 0)
@@ -135,11 +152,13 @@ int main(int argc, char* argv[])
 		else
 		{
 			main_init_share();
-			signal(SIGCHLD, &main_child_signal);
+			signal(SIGCHLD, &main_on_sigchld);
+			signal_term(&main_on_sigterm);
 			pid_t worker_pid = fork();
 			if (worker_pid == 0)
 			{
 				signal(SIGCHLD, SIG_DFL);
+				signal_term(&ec_on_sigterm);
 				return main_ec_worker();
 			}
 			else if (worker_pid > 0)
@@ -157,28 +176,54 @@ int main(int argc, char* argv[])
 	}
 	else
 	{
-		int val = atoi(argv[1]);
-		if (val < 40 || val > 100)
+		if (argv[1][0] == '-')
 		{
-			printf("invalid fan duty %d!\n", val);
-			return EXIT_FAILURE;
+			printf(
+					"\n\
+Usage: clevo-indicator [fan-duty-percentage]\n\
+\n\
+Dump/Control fan duty on Clevo laptops. Display indicator by default.\n\
+\n\
+Arguments:\n\
+  [fan-duty-percentage]\t\tTarget fan duty in percentage, from 40 to 100\n\
+  -?\t\t\t\tDisplay this help and exit\n\
+\n\
+Without arguments this program should attempt to display an indicator in\n\
+the Ubuntu tray area for fan information display and control. The indicator\n\
+requires this program to have setuid=root flag but run from the desktop user\n\
+, because a root user is not allowed to display a desktop indicator while a\n\
+non-root user is not allowed to control Clevo EC (Embedded Controller that's\n\
+responsible of the fan). Fix permissions of this executable if it fails to\n\
+run:\n\
+    sudo chown root clevo-indicator\n\
+    sudo chmod u+s  clevo-indicator\n\
+\n\
+Note any fan duty change should take 1-2 seconds to come into effect - you\n\
+can verify by the fan speed displayed on indicator icon and also louder fan\n\
+noise.\n\
+\n\
+In the indicator mode, this program would always attempt to load kernel\n\
+module 'ec_sys', in order to query EC information from\n\
+'/sys/kernel/debug/ec/ec0/io' instead of polling EC ports for readings,\n\
+which may be more risky if interrupted or concurrently operated during the\n\
+process.\n\
+\n\
+DO NOT MANIPULATE OR QUERY EC I/O PORTS WHILE THIS PROGRAM IS RUNNING.\n\
+\n");
+			return main_dump_fan();
 		}
-		return main_test_fan(val);
+		else
+		{
+			int val = atoi(argv[1]);
+			if (val < 40 || val > 100)
+			{
+				printf("invalid fan duty %d!\n", val);
+				return EXIT_FAILURE;
+			}
+			return main_test_fan(val);
+		}
 	}
 	return EXIT_SUCCESS;
-}
-
-static int main_check_arg(const char* arg)
-{
-	if (arg == NULL)
-		return EXIT_FAILURE;
-	if (*arg == '\0')
-		return EXIT_FAILURE;
-	char c = *arg;
-	if (c >= '0' && c <= '9')
-		return EXIT_SUCCESS;
-	else
-		return EXIT_FAILURE;
 }
 
 static void main_init_share(void)
@@ -188,6 +233,7 @@ static void main_init_share(void)
 	share_info = shm;
 	share_info->exit = 0;
 	share_info->cpu_temp = 0;
+	share_info->gpu_temp = 0;
 	share_info->fan_duty = 0;
 	share_info->fan_rpms = 0;
 	share_info->auto_duty = 1;
@@ -226,6 +272,7 @@ static int main_ec_worker(void)
 			break;
 		case 0x100:
 			share_info->cpu_temp = buf[EC_REG_CPU_TEMP];
+			share_info->gpu_temp = buf[EC_REG_GPU_TEMP];
 			share_info->fan_duty = calculate_fan_duty(buf[EC_REG_FAN_DUTY]);
 			share_info->fan_rpms = calculate_fan_rpms(buf[EC_REG_FAN_RPMS_HI],
 					buf[EC_REG_FAN_RPMS_LO]);
@@ -244,7 +291,10 @@ static int main_ec_worker(void)
 			int next_duty = ec_auto_duty_adjust();
 			if (next_duty != 0 && next_duty != share_info->auto_duty_val)
 			{
-				printf("auto fan duty to: %d%%\n", next_duty);
+				char s_time[256];
+				get_time_string(s_time, 256, "%m/%d %H:%M:%S");
+				printf("%s CPU=%d°C, GPU=%d°C, auto fan duty to %d%%\n", s_time,
+						share_info->cpu_temp, share_info->gpu_temp, next_duty);
 				ec_write_fan_duty(next_duty);
 				share_info->auto_duty_val = next_duty;
 			}
@@ -254,27 +304,6 @@ static int main_ec_worker(void)
 	}
 	printf("worker quit\n");
 	return EXIT_SUCCESS;
-}
-
-static int ec_auto_duty_adjust(void)
-{
-	int temp = share_info->cpu_temp;
-	int duty = share_info->fan_duty;
-	//
-	if (temp >= 80 && duty < 100)
-		return 100;
-	if (temp >= 70 && (duty < 90 || (temp <= 75 && duty > 90)))
-		return 90;
-	if (temp >= 60 && (duty < 80 || (temp <= 65 && duty > 80)))
-		return 80;
-	if (temp >= 50 && (duty < 70 || (temp <= 55 && duty > 70)))
-		return 70;
-	if (temp >= 40 && (duty < 60 || (temp <= 45 && duty > 60)))
-		return 60;
-	if (temp >= 30 && (duty < 50 || (temp <= 35 && duty > 50)))
-		return 50;
-	//
-	return 0;
 }
 
 static void main_ui_worker(int argc, char** argv)
@@ -316,28 +345,38 @@ static void main_ui_worker(int argc, char** argv)
 	g_timeout_add(500, &ui_update, NULL);
 	ui_toggle_menuitems(share_info->fan_duty);
 	gtk_main();
-	printf("quit UI\n");
+	printf("main on UI quit\n");
 }
 
-static void main_child_signal(int signum)
+static void main_on_sigchld(int signum)
 {
-	printf("worker quit signal\n");
+	printf("main on worker quit signal\n");
+	exit (EXIT_SUCCESS);
+}
+
+static void main_on_sigterm(int signum)
+{
+	printf("main on signal: %s\n", strsignal(signum));
+	if (share_info != NULL)
+		share_info->exit = 1;
 	exit (EXIT_SUCCESS);
 }
 
 static int main_dump_fan(void)
 {
-	printf("Dump FAN\n");
-	printf("FAN Duty: %d%%\n", ec_query_fan_duty());
-	printf("FAN RPMs: %d RPM\n", ec_query_fan_rpms());
-	printf("CPU Temp: %d°C\n", ec_query_cpu_temp());
+	printf("Dump fan information\n");
+	printf("  FAN Duty: %d%%\n", ec_query_fan_duty());
+	printf("  FAN RPMs: %d RPM\n", ec_query_fan_rpms());
+	printf("  CPU Temp: %d°C\n", ec_query_cpu_temp());
+	printf("  GPU Temp: %d°C\n", ec_query_gpu_temp());
 	return EXIT_SUCCESS;
 }
 
 static int main_test_fan(int duty_percentage)
 {
-	printf("Test FAN %d%%\n", duty_percentage);
+	printf("Change fan duty to %d%%\n", duty_percentage);
 	ec_write_fan_duty(duty_percentage);
+	printf("\n");
 	main_dump_fan();
 	return EXIT_SUCCESS;
 }
@@ -345,8 +384,8 @@ static int main_test_fan(int duty_percentage)
 static gboolean ui_update(gpointer user_data)
 {
 	char label[256];
-	sprintf(label, "%d ℃", share_info->cpu_temp);
-	app_indicator_set_label(indicator, label, "XXX");
+	sprintf(label, "%d℃ %d℃", share_info->cpu_temp, share_info->gpu_temp);
+	app_indicator_set_label(indicator, label, "XXXXXX");
 	char icon_name[256];
 	double load = ((double) share_info->fan_rpms) / MAX_FAN_RPM * 100.0;
 	double load_r = round(load / 5.0) * 5.0;
@@ -404,9 +443,42 @@ static int ec_init(void)
 	return EXIT_SUCCESS;
 }
 
+static void ec_on_sigterm(int signum)
+{
+	printf("ec on signal: %s\n", strsignal(signum));
+	if (share_info != NULL)
+		share_info->exit = 1;
+}
+
+static int ec_auto_duty_adjust(void)
+{
+	int temp = MAX(share_info->cpu_temp, share_info->gpu_temp);
+	int duty = share_info->fan_duty;
+	//
+	if (temp >= 80 && duty < 100)
+		return 100;
+	if (temp >= 70 && (duty < 90 || (temp <= 75 && duty > 90)))
+		return 90;
+	if (temp >= 60 && (duty < 80 || (temp <= 65 && duty > 80)))
+		return 80;
+	if (temp >= 50 && (duty < 70 || (temp <= 55 && duty > 70)))
+		return 70;
+	if (temp >= 40 && (duty < 60 || (temp <= 45 && duty > 60)))
+		return 60;
+	if (temp >= 30 && (duty < 50 || (temp <= 35 && duty > 50)))
+		return 50;
+	//
+	return 0;
+}
+
 static int ec_query_cpu_temp(void)
 {
 	return ec_io_read(EC_REG_CPU_TEMP);
+}
+
+static int ec_query_gpu_temp(void)
+{
+	return ec_io_read(EC_REG_GPU_TEMP);
 }
 
 static int ec_query_fan_duty(void)
@@ -492,4 +564,25 @@ static int calculate_fan_rpms(int raw_rpm_high, int raw_rpm_low)
 {
 	int raw_rpm = (raw_rpm_high << 8) + raw_rpm_low;
 	return raw_rpm > 0 ? (2156220 / raw_rpm) : 0;
+}
+
+static void get_time_string(char* buffer, size_t max, const char* format)
+{
+	time_t timer;
+	struct tm tm_info;
+	time(&timer);
+	localtime_r(&timer, &tm_info);
+	strftime(buffer, max, format, &tm_info);
+}
+
+static void signal_term(__sighandler_t handler)
+{
+	signal(SIGHUP, handler);
+	signal(SIGINT, handler);
+	signal(SIGQUIT, handler);
+	signal(SIGPIPE, handler);
+	signal(SIGALRM, handler);
+	signal(SIGTERM, handler);
+	signal(SIGUSR1, handler);
+	signal(SIGUSR2, handler);
 }
