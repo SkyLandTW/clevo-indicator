@@ -20,7 +20,12 @@
  ============================================================================
  Auto fan control algorithm:
 
- The algorithm is to replace
+ The algorithm is to replace the builtin auto fan-control algorithm in Clevo
+ laptops which is apparently broken in recent models such as W350SSQ, where the
+ fan doesn't get kicked until both of GPU and CPU are really hot (and GPU
+ cannot be hot anymore thanks to nVIDIA's Maxwell chips). It's far more
+ aggressive than the builtin algorithm in order to keep the temperatures below
+ 60°C all the time, for maximized performance with Intel turbo boost enabled.
 
  ============================================================================
  */
