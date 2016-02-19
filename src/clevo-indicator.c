@@ -40,11 +40,14 @@
 #include <string.h>
 #include <sys/io.h>
 #include <sys/mman.h>
+#include <sys/prctl.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <libappindicator/app-indicator.h>
+
+#define NAME "clevo-indicator"
 
 #define EC_SC 0x66
 #define EC_DATA 0x62
@@ -99,6 +102,7 @@ static int ec_io_do(const uint32_t cmd, const uint32_t port,
 		const uint8_t value);
 static int calculate_fan_duty(int raw_duty);
 static int calculate_fan_rpms(int raw_rpm_high, int raw_rpm_low);
+static int check_proc_instances(const char* proc_name);
 static void get_time_string(char* buffer, size_t max, const char* format);
 static void signal_term(__sighandler_t handler);
 
@@ -112,7 +116,7 @@ struct
 	MenuItemType type;
 	GtkWidget* widget;
 
-} menuitems[] =
+}static menuitems[] =
 {
 { "Set FAN to AUTO", G_CALLBACK(ui_command_set_fan), 0, AUTO, NULL },
 { "", NULL, 0L, NA, NULL },
@@ -137,11 +141,31 @@ struct
 	volatile int auto_duty_val;
 	volatile int manual_next_fan_duty;
 	volatile int manual_prev_fan_duty;
-}*share_info = NULL;
+}static *share_info = NULL;
+
+static pid_t parent_pid = 0;
 
 int main(int argc, char* argv[])
 {
 	printf("Simple fan control utility for Clevo laptops\n");
+	if (check_proc_instances(NAME) > 1)
+	{
+		printf("Multiple running instances!\n");
+		char* display = getenv("DISPLAY");
+		if (display != NULL && strlen(display) > 0)
+		{
+			int desktop_uid = getuid();
+			setuid(desktop_uid);
+			//
+			gtk_init(&argc, &argv);
+			GtkWidget* dialog = gtk_message_dialog_new(NULL, 0,
+					GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE,
+					"Multiple running instances of %s!", NAME);
+			gtk_dialog_run(GTK_DIALOG(dialog));
+			gtk_widget_destroy(dialog);
+		}
+		return EXIT_FAILURE;
+	}
 	if (ec_init() != EXIT_SUCCESS)
 	{
 		printf("unable to control EC: %s\n", strerror(errno));
@@ -156,6 +180,7 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
+			parent_pid = getpid();
 			main_init_share();
 			signal(SIGCHLD, &main_on_sigchld);
 			signal_term(&main_on_sigterm);
@@ -253,7 +278,13 @@ static int main_ec_worker(void)
 	system("modprobe ec_sys");
 	while (share_info->exit == 0)
 	{
-		// write
+		// check parent
+		if (parent_pid != 0 && kill(parent_pid, 0) == -1)
+		{
+			printf("worker on parent death\n");
+			break;
+		}
+		// write EC
 		int new_fan_duty = share_info->manual_next_fan_duty;
 		if (new_fan_duty != 0
 				&& new_fan_duty != share_info->manual_prev_fan_duty)
@@ -261,7 +292,7 @@ static int main_ec_worker(void)
 			ec_write_fan_duty(new_fan_duty);
 			share_info->manual_prev_fan_duty = new_fan_duty;
 		}
-		// read
+		// read EC
 		int io_fd = open("/sys/kernel/debug/ec/ec0/io", O_RDONLY, 0);
 		if (io_fd < 0)
 		{
@@ -290,7 +321,7 @@ static int main_ec_worker(void)
 			printf("wrong EC size from sysfs: %ld\n", len);
 		}
 		close(io_fd);
-		// auto
+		// auto EC
 		if (share_info->auto_duty == 1)
 		{
 			int next_duty = ec_auto_duty_adjust();
@@ -339,7 +370,7 @@ static void main_ui_worker(int argc, char** argv)
 	}
 	gtk_widget_show_all(indicator_menu);
 	//
-	indicator = app_indicator_new("clevo-indicator", "brasero",
+	indicator = app_indicator_new(NAME, "brasero",
 			APP_INDICATOR_CATEGORY_HARDWARE);
 	g_assert(IS_APP_INDICATOR(indicator));
 	app_indicator_set_label(indicator, "Init..", "XX");
@@ -569,6 +600,44 @@ static int calculate_fan_rpms(int raw_rpm_high, int raw_rpm_low)
 {
 	int raw_rpm = (raw_rpm_high << 8) + raw_rpm_low;
 	return raw_rpm > 0 ? (2156220 / raw_rpm) : 0;
+}
+
+static int check_proc_instances(const char* proc_name)
+{
+	int proc_name_len = strlen(proc_name);
+	pid_t this_pid = getpid();
+	DIR* dir;
+	if (!(dir = opendir("/proc")))
+	{
+		perror("can't open /proc");
+		return -1;
+	}
+	int instance_count;
+	struct dirent* ent;
+	while ((ent = readdir(dir)) != NULL)
+	{
+		char* endptr;
+		long lpid = strtol(ent->d_name, &endptr, 10);
+		if (*endptr != '\0')
+			continue;
+		if (lpid == this_pid)
+			continue;
+		char buf[512];
+		snprintf(buf, sizeof(buf), "/proc/%ld/comm", lpid);
+		FILE* fp = fopen(buf, "r");
+		if (fp)
+		{
+			if (fgets(buf, sizeof(buf), fp) != NULL)
+			{
+				if ((buf[proc_name_len] == '\n' || buf[proc_name_len] == '\0')
+						&& strncmp(buf, proc_name, proc_name_len) == 0)
+					instance_count += 1;
+			}
+			fclose(fp);
+		}
+	}
+	closedir(dir);
+	return instance_count;
 }
 
 static void get_time_string(char* buffer, size_t max, const char* format)

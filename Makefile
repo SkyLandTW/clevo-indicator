@@ -4,6 +4,7 @@ CC = gcc
 CFLAGS = -c -Wall
 LDFLAGS =
 
+DSTDIR := /usr/local
 OBJDIR := obj
 SRCDIR := src
 
@@ -17,20 +18,25 @@ LDFLAGS += `pkg-config --libs appindicator3-0.1`
 
 all: $(TARGET)
 
+install: $(TARGET)
+	@echo Install to ${DSTDIR}/bin/
+	@sudo install -m 4750 -g adm $(TARGET) ${DSTDIR}/bin/
+
 test: $(TARGET)
 	@sudo chown root $(TARGET)
-	@sudo chmod u+s $(TARGET)
+	@sudo chgrp adm  $(TARGET)
+	@sudo chmod 4750 $(TARGET)
 
-$(TARGET): $(OBJ)
+$(TARGET): Makefile $(OBJ)
 	@mkdir -p bin
-	@echo $(TARGET) from $(OBJ)
+	@echo linking $(TARGET) from $(OBJ)
 	@$(CC) $(OBJ) -o $(TARGET) $(LDFLAGS) -lm
 
 clean:
 	rm $(OBJ) $(TARGET)
 
 $(OBJDIR)/%.o : $(SRCDIR)/%.c
-	@echo $< 
+	@echo compiling $< 
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 #$(OBJECTS): | obj

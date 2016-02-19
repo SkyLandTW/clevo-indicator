@@ -10,3 +10,15 @@ It shows the CPU temperature on the left and the GPU temperature on the right, a
 
 
 For command-line, use *-h* to display help, or a number representing percentage of fan duty to control the fan (from 40% to 100%).
+
+
+
+Build and Install
+-----------------
+
+```shell
+sudo apt-get install libappindicator3-dev
+git clone git@github.com:AqD/clevo-indicator.git
+cd clevo-indicator
+make install
+```
