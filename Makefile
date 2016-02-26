@@ -37,6 +37,7 @@ clean:
 
 $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	@echo compiling $< 
+	@mkdir -p obj
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 #$(OBJECTS): | obj
