@@ -437,12 +437,14 @@ static void ui_command_set_fan(long fan_duty)
 	{
 		printf("clicked on fan duty auto\n");
 		share_info->auto_duty = 1;
+		share_info->auto_duty_val = 0;
 		share_info->manual_next_fan_duty = 0;
 	}
 	else
 	{
 		printf("clicked on fan duty: %d\n", fan_duty_val);
 		share_info->auto_duty = 0;
+		share_info->auto_duty_val = 0;
 		share_info->manual_next_fan_duty = fan_duty_val;
 	}
 	ui_toggle_menuitems(fan_duty_val);
@@ -493,16 +495,35 @@ static int ec_auto_duty_adjust(void)
 	//
 	if (temp >= 80 && duty < 100)
 		return 100;
-	if (temp >= 70 && (duty < 90 || (temp <= 75 && duty > 90)))
+	if (temp >= 70 && duty < 90)
 		return 90;
-	if (temp >= 60 && (duty < 80 || (temp <= 65 && duty > 80)))
+	if (temp >= 60 && duty < 80)
 		return 80;
-	if (temp >= 50 && (duty < 70 || (temp <= 55 && duty > 70)))
+	if (temp >= 50 && duty < 70)
 		return 70;
-	if (temp >= 40 && (duty < 60 || (temp <= 45 && duty > 60)))
+	if (temp >= 40 && duty < 60)
 		return 60;
-	if (temp >= 30 && (duty < 50 || (temp <= 35 && duty > 50)))
+	if (temp >= 30 && duty < 50)
 		return 50;
+	if (temp >= 20 && duty < 40)
+		return 40;
+	if (temp >= 10 && duty < 30)
+		return 30;
+	//
+	if (temp <= 15 && duty > 30)
+		return 30;
+	if (temp <= 25 && duty > 40)
+		return 40;
+	if (temp <= 35 && duty > 50)
+		return 50;
+	if (temp <= 45 && duty > 60)
+		return 60;
+	if (temp <= 55 && duty > 70)
+		return 70;
+	if (temp <= 65 && duty > 80)
+		return 80;
+	if (temp <= 75 && duty > 90)
+		return 90;
 	//
 	return 0;
 }
