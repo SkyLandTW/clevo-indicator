@@ -1,7 +1,7 @@
 vpath %.c ../src
 
 CC = gcc
-CFLAGS = -c -Wall
+CFLAGS = -c -Wall -std=gnu99
 LDFLAGS =
 
 DSTDIR := /usr/local
@@ -27,7 +27,7 @@ test: $(TARGET)
 	@sudo chgrp adm  $(TARGET)
 	@sudo chmod 4750 $(TARGET)
 
-$(TARGET): Makefile $(OBJ)
+$(TARGET): $(OBJ) Makefile
 	@mkdir -p bin
 	@echo linking $(TARGET) from $(OBJ)
 	@$(CC) $(OBJ) -o $(TARGET) $(LDFLAGS) -lm
@@ -35,7 +35,7 @@ $(TARGET): Makefile $(OBJ)
 clean:
 	rm $(OBJ) $(TARGET)
 
-$(OBJDIR)/%.o : $(SRCDIR)/%.c
+$(OBJDIR)/%.o : $(SRCDIR)/%.c Makefile
 	@echo compiling $< 
 	@mkdir -p obj
 	@$(CC) $(CFLAGS) -c $< -o $@
