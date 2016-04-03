@@ -84,9 +84,10 @@ static void main_on_sigterm(int signum);
 static int main_dump_fan(void);
 static int main_test_fan(int duty_percentage);
 static gboolean ui_update(gpointer user_data);
-static void ui_command_set_fan(long fan_duty);
+static void ui_command_set_fan_manual(long fan_duty);
+static void ui_command_set_fan_auto(long fan_duty);
 static void ui_command_quit(gchar* command);
-static void ui_toggle_menuitems(int fan_duty);
+static void ui_toggle_menuitems(int fan_duty, int type);
 static void ec_on_sigterm(int signum);
 static int ec_init(void);
 static int ec_auto_duty_adjust(void);
@@ -118,13 +119,16 @@ struct
 
 }static menuitems[] =
 {
-{ "Set FAN to AUTO", G_CALLBACK(ui_command_set_fan), 0, AUTO, NULL },
+{ "Set FAN to AUTO [50°c]", G_CALLBACK(ui_command_set_fan_auto), 50, AUTO, NULL },
+{ "Set FAN to AUTO [60°c]", G_CALLBACK(ui_command_set_fan_auto), 60, AUTO, NULL },
+{ "Set FAN to AUTO [70°c]", G_CALLBACK(ui_command_set_fan_auto), 70, AUTO, NULL },
+{ "Set FAN to AUTO [80°c]", G_CALLBACK(ui_command_set_fan_auto), 80, AUTO, NULL },
 { "", NULL, 0L, NA, NULL },
-{ "Set FAN to  60%", G_CALLBACK(ui_command_set_fan), 60, MANUAL, NULL },
-{ "Set FAN to  70%", G_CALLBACK(ui_command_set_fan), 70, MANUAL, NULL },
-{ "Set FAN to  80%", G_CALLBACK(ui_command_set_fan), 80, MANUAL, NULL },
-{ "Set FAN to  90%", G_CALLBACK(ui_command_set_fan), 90, MANUAL, NULL },
-{ "Set FAN to 100%", G_CALLBACK(ui_command_set_fan), 100, MANUAL, NULL },
+{ "Set FAN to  60%", G_CALLBACK(ui_command_set_fan_manual), 60, MANUAL, NULL },
+{ "Set FAN to  70%", G_CALLBACK(ui_command_set_fan_manual), 70, MANUAL, NULL },
+{ "Set FAN to  80%", G_CALLBACK(ui_command_set_fan_manual), 80, MANUAL, NULL },
+{ "Set FAN to  90%", G_CALLBACK(ui_command_set_fan_manual), 90, MANUAL, NULL },
+{ "Set FAN to 100%", G_CALLBACK(ui_command_set_fan_manual), 100, MANUAL, NULL },
 { "", NULL, 0L, NA, NULL },
 { "Quit", G_CALLBACK(ui_command_quit), 0L, NA, NULL } };
 
@@ -379,7 +383,7 @@ static void main_ui_worker(int argc, char** argv)
 	app_indicator_set_title(indicator, "Clevo");
 	app_indicator_set_menu(indicator, GTK_MENU(indicator_menu));
 	g_timeout_add(500, &ui_update, NULL);
-	ui_toggle_menuitems(share_info->fan_duty);
+	ui_toggle_menuitems(share_info->fan_duty, NA);
 	gtk_main();
 	printf("main on UI quit\n");
 }
@@ -430,24 +434,36 @@ static gboolean ui_update(gpointer user_data)
 	return G_SOURCE_CONTINUE;
 }
 
-static void ui_command_set_fan(long fan_duty)
+static void ui_command_set_fan_manual(long fan_duty)
 {
 	int fan_duty_val = (int) fan_duty;
-	if (fan_duty_val == 0)
-	{
+
+	printf("clicked on fan duty: %d\n", fan_duty_val);
+	share_info->auto_duty = 0;
+	share_info->auto_duty_val = 0;
+	share_info->manual_next_fan_duty = fan_duty_val;
+	
+	ui_toggle_menuitems(fan_duty_val, MANUAL);
+}
+
+static void ui_command_set_fan_auto(long fan_duty)
+{
+	int fan_duty_val = (int) fan_duty;
+	/*if (fan_duty_val == 0)
+	{*/
 		printf("clicked on fan duty auto\n");
 		share_info->auto_duty = 1;
 		share_info->auto_duty_val = 0;
 		share_info->manual_next_fan_duty = 0;
-	}
+	/*}
 	else
 	{
 		printf("clicked on fan duty: %d\n", fan_duty_val);
 		share_info->auto_duty = 0;
 		share_info->auto_duty_val = 0;
 		share_info->manual_next_fan_duty = fan_duty_val;
-	}
-	ui_toggle_menuitems(fan_duty_val);
+	}*/
+	ui_toggle_menuitems(fan_duty_val, AUTO);
 }
 
 static void ui_command_quit(gchar* command)
@@ -456,15 +472,16 @@ static void ui_command_quit(gchar* command)
 	gtk_main_quit();
 }
 
-static void ui_toggle_menuitems(int fan_duty)
+static void ui_toggle_menuitems(int fan_duty, int type)
 {
 	for (int i = 0; i < menuitem_count; i++)
 	{
 		if (menuitems[i].widget == NULL)
 			continue;
-		if (fan_duty == 0)
+		if (type == AUTO)
 			gtk_widget_set_sensitive(menuitems[i].widget,
-					menuitems[i].type != AUTO);
+					menuitems[i].type != AUTO
+							|| (int) menuitems[i].option != fan_duty);
 		else
 			gtk_widget_set_sensitive(menuitems[i].widget,
 					menuitems[i].type != MANUAL
