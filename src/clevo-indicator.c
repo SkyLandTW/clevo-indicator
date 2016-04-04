@@ -71,6 +71,10 @@
 
 #define MAX_FAN_RPM 4400.0
 
+#define MAX_DUTY 100
+#define MIN_DUTY 50
+#define TEMP_BRACKET 30 // In auto mode, the temperature will be kept between (threshold - TEMP_BRACKET) and (threshold + TEMP_BRACKET)
+
 typedef enum
 {
 	NA = 0, AUTO = 1, MANUAL = 2
@@ -90,7 +94,7 @@ static void ui_command_quit(gchar* command);
 static void ui_toggle_menuitems(int fan_duty, int type);
 static void ec_on_sigterm(int signum);
 static int ec_init(void);
-static int ec_auto_duty_adjust(void);
+static int ec_auto_duty_adjust(int threshold);
 static int ec_query_cpu_temp(void);
 static int ec_query_gpu_temp(void);
 static int ec_query_fan_duty(void);
@@ -119,11 +123,12 @@ struct
 
 }static menuitems[] =
 {
-{ "Set FAN to AUTO [50°c]", G_CALLBACK(ui_command_set_fan_auto), 50, AUTO, NULL },
-{ "Set FAN to AUTO [60°c]", G_CALLBACK(ui_command_set_fan_auto), 60, AUTO, NULL },
-{ "Set FAN to AUTO [70°c]", G_CALLBACK(ui_command_set_fan_auto), 70, AUTO, NULL },
-{ "Set FAN to AUTO [80°c]", G_CALLBACK(ui_command_set_fan_auto), 80, AUTO, NULL },
+{ "Set FAN to AUTO [Colder]", G_CALLBACK(ui_command_set_fan_auto), 40, AUTO, NULL },
+{ "Set FAN to AUTO [Cold]", G_CALLBACK(ui_command_set_fan_auto), 50, AUTO, NULL },
+{ "Set FAN to AUTO [Normal]", G_CALLBACK(ui_command_set_fan_auto), 60, AUTO, NULL },
+{ "Set FAN to AUTO [Hot]", G_CALLBACK(ui_command_set_fan_auto), 70, AUTO, NULL },
 { "", NULL, 0L, NA, NULL },
+{ "Set FAN to  50%", G_CALLBACK(ui_command_set_fan_manual), 50, MANUAL, NULL },
 { "Set FAN to  60%", G_CALLBACK(ui_command_set_fan_manual), 60, MANUAL, NULL },
 { "Set FAN to  70%", G_CALLBACK(ui_command_set_fan_manual), 70, MANUAL, NULL },
 { "Set FAN to  80%", G_CALLBACK(ui_command_set_fan_manual), 80, MANUAL, NULL },
@@ -142,6 +147,7 @@ struct
 	volatile int fan_duty;
 	volatile int fan_rpms;
 	volatile int auto_duty;
+	volatile int auto_duty_threshold;
 	volatile int auto_duty_val;
 	volatile int manual_next_fan_duty;
 	volatile int manual_prev_fan_duty;
@@ -219,7 +225,7 @@ Usage: clevo-indicator [fan-duty-percentage]\n\
 Dump/Control fan duty on Clevo laptops. Display indicator by default.\n\
 \n\
 Arguments:\n\
-  [fan-duty-percentage]\t\tTarget fan duty in percentage, from 40 to 100\n\
+  [fan-duty-percentage]\t\tTarget fan duty in percentage, from %d to %d\n\
   -?\t\t\t\tDisplay this help and exit\n\
 \n\
 Without arguments this program should attempt to display an indicator in\n\
@@ -243,13 +249,13 @@ which may be more risky if interrupted or concurrently operated during the\n\
 process.\n\
 \n\
 DO NOT MANIPULATE OR QUERY EC I/O PORTS WHILE THIS PROGRAM IS RUNNING.\n\
-\n");
+\n", MIN_DUTY, MAX_DUTY);
 			return main_dump_fan();
 		}
 		else
 		{
 			int val = atoi(argv[1]);
-			if (val < 40 || val > 100)
+			if (val < MIN_DUTY || val > MAX_DUTY)
 			{
 				printf("invalid fan duty %d!\n", val);
 				return EXIT_FAILURE;
@@ -271,6 +277,7 @@ static void main_init_share(void)
 	share_info->fan_duty = 0;
 	share_info->fan_rpms = 0;
 	share_info->auto_duty = 1;
+	share_info->auto_duty_threshold = 60;
 	share_info->auto_duty_val = 0;
 	share_info->manual_next_fan_duty = 0;
 	share_info->manual_prev_fan_duty = 0;
@@ -328,7 +335,7 @@ static int main_ec_worker(void)
 		// auto EC
 		if (share_info->auto_duty == 1)
 		{
-			int next_duty = ec_auto_duty_adjust();
+			int next_duty = ec_auto_duty_adjust(share_info->auto_duty_threshold);
 			if (next_duty != 0 && next_duty != share_info->auto_duty_val)
 			{
 				char s_time[256];
@@ -449,20 +456,11 @@ static void ui_command_set_fan_manual(long fan_duty)
 static void ui_command_set_fan_auto(long fan_duty)
 {
 	int fan_duty_val = (int) fan_duty;
-	/*if (fan_duty_val == 0)
-	{*/
-		printf("clicked on fan duty auto\n");
-		share_info->auto_duty = 1;
-		share_info->auto_duty_val = 0;
-		share_info->manual_next_fan_duty = 0;
-	/*}
-	else
-	{
-		printf("clicked on fan duty: %d\n", fan_duty_val);
-		share_info->auto_duty = 0;
-		share_info->auto_duty_val = 0;
-		share_info->manual_next_fan_duty = fan_duty_val;
-	}*/
+	printf("clicked on fan duty auto\n");
+	share_info->auto_duty = 1;
+	share_info->auto_duty_val = 0;
+	share_info->auto_duty_threshold = fan_duty_val;
+	share_info->manual_next_fan_duty = 0;
 	ui_toggle_menuitems(fan_duty_val, AUTO);
 }
 
@@ -505,44 +503,18 @@ static void ec_on_sigterm(int signum)
 		share_info->exit = 1;
 }
 
-static int ec_auto_duty_adjust(void)
+static int ec_auto_duty_adjust(int threshold)
 {
-	int temp = MAX(share_info->cpu_temp, share_info->gpu_temp);
-	int duty = share_info->fan_duty;
-	//
-	if (temp >= 80 && duty < 100)
-		return 100;
-	if (temp >= 70 && duty < 90)
-		return 90;
-	if (temp >= 60 && duty < 80)
-		return 80;
-	if (temp >= 50 && duty < 70)
-		return 70;
-	if (temp >= 40 && duty < 60)
-		return 60;
-	if (temp >= 30 && duty < 50)
-		return 50;
-	if (temp >= 20 && duty < 40)
-		return 40;
-	if (temp >= 10 && duty < 30)
-		return 30;
-	//
-	if (temp <= 15 && duty > 30)
-		return 30;
-	if (temp <= 25 && duty > 40)
-		return 40;
-	if (temp <= 35 && duty > 50)
-		return 50;
-	if (temp <= 45 && duty > 60)
-		return 60;
-	if (temp <= 55 && duty > 70)
-		return 70;
-	if (temp <= 65 && duty > 80)
-		return 80;
-	if (temp <= 75 && duty > 90)
-		return 90;
-	//
-	return 0;
+	float duty;
+	int temp_min = threshold - TEMP_BRACKET;
+	int temp_max = threshold + TEMP_BRACKET;
+
+	int current_temp = MAX(share_info->cpu_temp, share_info->gpu_temp);
+
+        // return the speed fan between MIN_DUTY and MAX_DUTY where temp_min give MIN_DUTY and temp_max give MAX_DUTY with a linear ratio in between
+	duty = floor((current_temp * (MAX_DUTY - MIN_DUTY) / (temp_max - temp_min)) + (((temp_max * MIN_DUTY) - (MAX_DUTY * temp_min)) / (temp_max - temp_min)));
+
+	return (int) duty;
 }
 
 static int ec_query_cpu_temp(void)
@@ -570,11 +542,18 @@ static int ec_query_fan_rpms(void)
 
 static int ec_write_fan_duty(int duty_percentage)
 {
-	if (duty_percentage < 60 || duty_percentage > 100)
+	if (duty_percentage < MIN_DUTY)
 	{
-		printf("Wrong fan duty to write: %d\n", duty_percentage);
-		return EXIT_FAILURE;
+		printf("Wrong fan duty to write: %d aligning it to %d\n", duty_percentage, MIN_DUTY);
+		duty_percentage = MIN_DUTY;
 	}
+
+	if (duty_percentage > MAX_DUTY)
+	{
+		printf("Wrong fan duty to write: %d aligning it to %d\n", duty_percentage, MAX_DUTY);
+		duty_percentage = MAX_DUTY;
+	}
+
 	double v_d = ((double) duty_percentage) / 100.0 * 255.0;
 	int v_i = (int) v_d;
 	return ec_io_do(0x99, 0x01, v_i);
