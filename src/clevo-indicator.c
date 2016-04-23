@@ -336,6 +336,7 @@ static int main_ec_worker(void)
 		if (share_info->auto_duty == 1)
 		{
 			int next_duty = ec_auto_duty_adjust(share_info->auto_duty_threshold);
+			printf("CPU=%d°C\n",share_info->cpu_temp);
 			if (next_duty != 0 && next_duty != share_info->auto_duty_val)
 			{
 				char s_time[256];
@@ -347,7 +348,7 @@ static int main_ec_worker(void)
 			}
 		}
 		//
-		usleep(500);
+		sleep(1);
 	}
 	printf("worker quit\n");
 	return EXIT_SUCCESS;
