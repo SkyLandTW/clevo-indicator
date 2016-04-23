@@ -146,7 +146,7 @@ struct
 	volatile int gpu_temp;
 	volatile int fan_duty;
 	volatile int fan_rpms;
-	volatile int auto_duty;
+	volatile int duty_type;
 	volatile int auto_duty_threshold;
 	volatile int auto_duty_val;
 	volatile int manual_next_fan_duty;
@@ -276,7 +276,7 @@ static void main_init_share(void)
 	share_info->gpu_temp = 0;
 	share_info->fan_duty = 0;
 	share_info->fan_rpms = 0;
-	share_info->auto_duty = 1;
+	share_info->duty_type = AUTO;
 	share_info->auto_duty_threshold = 60;
 	share_info->auto_duty_val = 0;
 	share_info->manual_next_fan_duty = 0;
@@ -333,10 +333,9 @@ static int main_ec_worker(void)
 		}
 		close(io_fd);
 		// auto EC
-		if (share_info->auto_duty == 1)
+		if (share_info->duty_type == AUTO)
 		{
 			int next_duty = ec_auto_duty_adjust(share_info->auto_duty_threshold);
-			printf("CPU=%d°C\n",share_info->cpu_temp);
 			if (next_duty != 0 && next_duty != share_info->auto_duty_val)
 			{
 				char s_time[256];
@@ -391,7 +390,7 @@ static void main_ui_worker(int argc, char** argv)
 	app_indicator_set_title(indicator, "Clevo");
 	app_indicator_set_menu(indicator, GTK_MENU(indicator_menu));
 	g_timeout_add(500, &ui_update, NULL);
-	ui_toggle_menuitems(share_info->fan_duty, NA);
+	ui_toggle_menuitems(share_info->auto_duty_threshold, share_info->duty_type);
 	gtk_main();
 	printf("main on UI quit\n");
 }
@@ -447,7 +446,7 @@ static void ui_command_set_fan_manual(long fan_duty)
 	int fan_duty_val = (int) fan_duty;
 
 	printf("clicked on fan duty: %d\n", fan_duty_val);
-	share_info->auto_duty = 0;
+	share_info->duty_type = MANUAL;
 	share_info->auto_duty_val = 0;
 	share_info->manual_next_fan_duty = fan_duty_val;
 	
@@ -458,7 +457,7 @@ static void ui_command_set_fan_auto(long fan_duty)
 {
 	int fan_duty_val = (int) fan_duty;
 	printf("clicked on fan duty auto\n");
-	share_info->auto_duty = 1;
+	share_info->duty_type = 1;
 	share_info->auto_duty_val = 0;
 	share_info->auto_duty_threshold = fan_duty_val;
 	share_info->manual_next_fan_duty = 0;
