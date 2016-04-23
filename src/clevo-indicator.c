@@ -123,8 +123,8 @@ struct
 
 }static menuitems[] =
 {
-{ "Set FAN to AUTO [Colder]", G_CALLBACK(ui_command_set_fan_auto), 40, AUTO, NULL },
-{ "Set FAN to AUTO [Cold]", G_CALLBACK(ui_command_set_fan_auto), 50, AUTO, NULL },
+{ "Set FAN to AUTO [Cooler]", G_CALLBACK(ui_command_set_fan_auto), 40, AUTO, NULL },
+{ "Set FAN to AUTO [Cool]", G_CALLBACK(ui_command_set_fan_auto), 50, AUTO, NULL },
 { "Set FAN to AUTO [Normal]", G_CALLBACK(ui_command_set_fan_auto), 60, AUTO, NULL },
 { "Set FAN to AUTO [Hot]", G_CALLBACK(ui_command_set_fan_auto), 70, AUTO, NULL },
 { "", NULL, 0L, NA, NULL },
