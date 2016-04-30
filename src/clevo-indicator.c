@@ -72,7 +72,7 @@
 #define MAX_FAN_RPM 4400.0
 
 #define MAX_DUTY 100
-#define MIN_DUTY 50
+#define MIN_DUTY 30
 #define TEMP_BRACKET 30 // In auto mode, the temperature will be kept between (threshold - TEMP_BRACKET) and (threshold + TEMP_BRACKET)
 
 typedef enum
@@ -158,6 +158,7 @@ static pid_t parent_pid = 0;
 int main(int argc, char* argv[])
 {
 	printf("Simple fan control utility for Clevo laptops\n");
+	printf("Current configurations:\n\tMin duty: %d%%\n\tMax duty: %d%%\n\tTemperature braket: ±%d°C\n", MIN_DUTY, MAX_DUTY, TEMP_BRACKET);
 	if (check_proc_instances(NAME) > 1)
 	{
 		printf("Multiple running instances!\n");
@@ -511,7 +512,7 @@ static int ec_auto_duty_adjust(int threshold)
 
 	int current_temp = MAX(share_info->cpu_temp, share_info->gpu_temp);
 
-        // return the speed fan between MIN_DUTY and MAX_DUTY where temp_min give MIN_DUTY and temp_max give MAX_DUTY with a linear ratio in between
+	// return the speed fan between MIN_DUTY and MAX_DUTY where temp_min give MIN_DUTY and temp_max give MAX_DUTY with a linear ratio in between
 	duty = floor((current_temp * (MAX_DUTY - MIN_DUTY) / (temp_max - temp_min)) + (((temp_max * MIN_DUTY) - (MAX_DUTY * temp_min)) / (temp_max - temp_min)));
 
 	return (int) duty;
