@@ -71,6 +71,10 @@
 
 #define MAX_FAN_RPM 4400.0
 
+#define MAX_DUTY 100
+#define MIN_DUTY 30
+#define TEMP_BRACKET 30 // In auto mode, the temperature will be kept between (threshold - TEMP_BRACKET) and (threshold + TEMP_BRACKET)
+
 typedef enum
 {
 	NA = 0, AUTO = 1, MANUAL = 2
@@ -84,12 +88,13 @@ static void main_on_sigterm(int signum);
 static int main_dump_fan(void);
 static int main_test_fan(int duty_percentage);
 static gboolean ui_update(gpointer user_data);
-static void ui_command_set_fan(long fan_duty);
+static void ui_command_set_fan_manual(long fan_duty);
+static void ui_command_set_fan_auto(long fan_duty);
 static void ui_command_quit(gchar* command);
-static void ui_toggle_menuitems(int fan_duty);
+static void ui_toggle_menuitems(int fan_duty, int type);
 static void ec_on_sigterm(int signum);
 static int ec_init(void);
-static int ec_auto_duty_adjust(void);
+static int ec_auto_duty_adjust(int threshold);
 static int ec_query_cpu_temp(void);
 static int ec_query_gpu_temp(void);
 static int ec_query_fan_duty(void);
@@ -118,13 +123,17 @@ struct
 
 }static menuitems[] =
 {
-{ "Set FAN to AUTO", G_CALLBACK(ui_command_set_fan), 0, AUTO, NULL },
+{ "Set FAN to AUTO [Cooler]", G_CALLBACK(ui_command_set_fan_auto), 40, AUTO, NULL },
+{ "Set FAN to AUTO [Cool]", G_CALLBACK(ui_command_set_fan_auto), 50, AUTO, NULL },
+{ "Set FAN to AUTO [Normal]", G_CALLBACK(ui_command_set_fan_auto), 60, AUTO, NULL },
+{ "Set FAN to AUTO [Hot]", G_CALLBACK(ui_command_set_fan_auto), 70, AUTO, NULL },
 { "", NULL, 0L, NA, NULL },
-{ "Set FAN to  60%", G_CALLBACK(ui_command_set_fan), 60, MANUAL, NULL },
-{ "Set FAN to  70%", G_CALLBACK(ui_command_set_fan), 70, MANUAL, NULL },
-{ "Set FAN to  80%", G_CALLBACK(ui_command_set_fan), 80, MANUAL, NULL },
-{ "Set FAN to  90%", G_CALLBACK(ui_command_set_fan), 90, MANUAL, NULL },
-{ "Set FAN to 100%", G_CALLBACK(ui_command_set_fan), 100, MANUAL, NULL },
+{ "Set FAN to  50%", G_CALLBACK(ui_command_set_fan_manual), 50, MANUAL, NULL },
+{ "Set FAN to  60%", G_CALLBACK(ui_command_set_fan_manual), 60, MANUAL, NULL },
+{ "Set FAN to  70%", G_CALLBACK(ui_command_set_fan_manual), 70, MANUAL, NULL },
+{ "Set FAN to  80%", G_CALLBACK(ui_command_set_fan_manual), 80, MANUAL, NULL },
+{ "Set FAN to  90%", G_CALLBACK(ui_command_set_fan_manual), 90, MANUAL, NULL },
+{ "Set FAN to 100%", G_CALLBACK(ui_command_set_fan_manual), 100, MANUAL, NULL },
 { "", NULL, 0L, NA, NULL },
 { "Quit", G_CALLBACK(ui_command_quit), 0L, NA, NULL } };
 
@@ -137,7 +146,8 @@ struct
 	volatile int gpu_temp;
 	volatile int fan_duty;
 	volatile int fan_rpms;
-	volatile int auto_duty;
+	volatile int duty_type;
+	volatile int auto_duty_threshold;
 	volatile int auto_duty_val;
 	volatile int manual_next_fan_duty;
 	volatile int manual_prev_fan_duty;
@@ -148,6 +158,7 @@ static pid_t parent_pid = 0;
 int main(int argc, char* argv[])
 {
 	printf("Simple fan control utility for Clevo laptops\n");
+	printf("Current configurations:\n\tMin duty: %d%%\n\tMax duty: %d%%\n\tTemperature braket: ±%d°C\n", MIN_DUTY, MAX_DUTY, TEMP_BRACKET);
 	if (check_proc_instances(NAME) > 1)
 	{
 		printf("Multiple running instances!\n");
@@ -215,7 +226,7 @@ Usage: clevo-indicator [fan-duty-percentage]\n\
 Dump/Control fan duty on Clevo laptops. Display indicator by default.\n\
 \n\
 Arguments:\n\
-  [fan-duty-percentage]\t\tTarget fan duty in percentage, from 40 to 100\n\
+  [fan-duty-percentage]\t\tTarget fan duty in percentage, from %d to %d\n\
   -?\t\t\t\tDisplay this help and exit\n\
 \n\
 Without arguments this program should attempt to display an indicator in\n\
@@ -239,13 +250,13 @@ which may be more risky if interrupted or concurrently operated during the\n\
 process.\n\
 \n\
 DO NOT MANIPULATE OR QUERY EC I/O PORTS WHILE THIS PROGRAM IS RUNNING.\n\
-\n");
+\n", MIN_DUTY, MAX_DUTY);
 			return main_dump_fan();
 		}
 		else
 		{
 			int val = atoi(argv[1]);
-			if (val < 40 || val > 100)
+			if (val < MIN_DUTY || val > MAX_DUTY)
 			{
 				printf("invalid fan duty %d!\n", val);
 				return EXIT_FAILURE;
@@ -266,7 +277,8 @@ static void main_init_share(void)
 	share_info->gpu_temp = 0;
 	share_info->fan_duty = 0;
 	share_info->fan_rpms = 0;
-	share_info->auto_duty = 1;
+	share_info->duty_type = AUTO;
+	share_info->auto_duty_threshold = 60;
 	share_info->auto_duty_val = 0;
 	share_info->manual_next_fan_duty = 0;
 	share_info->manual_prev_fan_duty = 0;
@@ -322,9 +334,9 @@ static int main_ec_worker(void)
 		}
 		close(io_fd);
 		// auto EC
-		if (share_info->auto_duty == 1)
+		if (share_info->duty_type == AUTO)
 		{
-			int next_duty = ec_auto_duty_adjust();
+			int next_duty = ec_auto_duty_adjust(share_info->auto_duty_threshold);
 			if (next_duty != 0 && next_duty != share_info->auto_duty_val)
 			{
 				char s_time[256];
@@ -336,7 +348,7 @@ static int main_ec_worker(void)
 			}
 		}
 		//
-		usleep(500);
+		sleep(1);
 	}
 	printf("worker quit\n");
 	return EXIT_SUCCESS;
@@ -379,7 +391,7 @@ static void main_ui_worker(int argc, char** argv)
 	app_indicator_set_title(indicator, "Clevo");
 	app_indicator_set_menu(indicator, GTK_MENU(indicator_menu));
 	g_timeout_add(500, &ui_update, NULL);
-	ui_toggle_menuitems(share_info->fan_duty);
+	ui_toggle_menuitems(share_info->auto_duty_threshold, share_info->duty_type);
 	gtk_main();
 	printf("main on UI quit\n");
 }
@@ -430,24 +442,27 @@ static gboolean ui_update(gpointer user_data)
 	return G_SOURCE_CONTINUE;
 }
 
-static void ui_command_set_fan(long fan_duty)
+static void ui_command_set_fan_manual(long fan_duty)
 {
 	int fan_duty_val = (int) fan_duty;
-	if (fan_duty_val == 0)
-	{
-		printf("clicked on fan duty auto\n");
-		share_info->auto_duty = 1;
-		share_info->auto_duty_val = 0;
-		share_info->manual_next_fan_duty = 0;
-	}
-	else
-	{
-		printf("clicked on fan duty: %d\n", fan_duty_val);
-		share_info->auto_duty = 0;
-		share_info->auto_duty_val = 0;
-		share_info->manual_next_fan_duty = fan_duty_val;
-	}
-	ui_toggle_menuitems(fan_duty_val);
+
+	printf("clicked on fan duty: %d\n", fan_duty_val);
+	share_info->duty_type = MANUAL;
+	share_info->auto_duty_val = 0;
+	share_info->manual_next_fan_duty = fan_duty_val;
+	
+	ui_toggle_menuitems(fan_duty_val, MANUAL);
+}
+
+static void ui_command_set_fan_auto(long fan_duty)
+{
+	int fan_duty_val = (int) fan_duty;
+	printf("clicked on fan duty auto\n");
+	share_info->duty_type = 1;
+	share_info->auto_duty_val = 0;
+	share_info->auto_duty_threshold = fan_duty_val;
+	share_info->manual_next_fan_duty = 0;
+	ui_toggle_menuitems(fan_duty_val, AUTO);
 }
 
 static void ui_command_quit(gchar* command)
@@ -456,15 +471,16 @@ static void ui_command_quit(gchar* command)
 	gtk_main_quit();
 }
 
-static void ui_toggle_menuitems(int fan_duty)
+static void ui_toggle_menuitems(int fan_duty, int type)
 {
 	for (int i = 0; i < menuitem_count; i++)
 	{
 		if (menuitems[i].widget == NULL)
 			continue;
-		if (fan_duty == 0)
+		if (type == AUTO)
 			gtk_widget_set_sensitive(menuitems[i].widget,
-					menuitems[i].type != AUTO);
+					menuitems[i].type != AUTO
+							|| (int) menuitems[i].option != fan_duty);
 		else
 			gtk_widget_set_sensitive(menuitems[i].widget,
 					menuitems[i].type != MANUAL
@@ -488,44 +504,18 @@ static void ec_on_sigterm(int signum)
 		share_info->exit = 1;
 }
 
-static int ec_auto_duty_adjust(void)
+static int ec_auto_duty_adjust(int threshold)
 {
-	int temp = MAX(share_info->cpu_temp, share_info->gpu_temp);
-	int duty = share_info->fan_duty;
-	//
-	if (temp >= 80 && duty < 100)
-		return 100;
-	if (temp >= 70 && duty < 90)
-		return 90;
-	if (temp >= 60 && duty < 80)
-		return 80;
-	if (temp >= 50 && duty < 70)
-		return 70;
-	if (temp >= 40 && duty < 60)
-		return 60;
-	if (temp >= 30 && duty < 50)
-		return 50;
-	if (temp >= 20 && duty < 40)
-		return 40;
-	if (temp >= 10 && duty < 30)
-		return 30;
-	//
-	if (temp <= 15 && duty > 30)
-		return 30;
-	if (temp <= 25 && duty > 40)
-		return 40;
-	if (temp <= 35 && duty > 50)
-		return 50;
-	if (temp <= 45 && duty > 60)
-		return 60;
-	if (temp <= 55 && duty > 70)
-		return 70;
-	if (temp <= 65 && duty > 80)
-		return 80;
-	if (temp <= 75 && duty > 90)
-		return 90;
-	//
-	return 0;
+	float duty;
+	int temp_min = threshold - TEMP_BRACKET;
+	int temp_max = threshold + TEMP_BRACKET;
+
+	int current_temp = MAX(share_info->cpu_temp, share_info->gpu_temp);
+
+	// return the speed fan between MIN_DUTY and MAX_DUTY where temp_min give MIN_DUTY and temp_max give MAX_DUTY with a linear ratio in between
+	duty = floor((current_temp * (MAX_DUTY - MIN_DUTY) / (temp_max - temp_min)) + (((temp_max * MIN_DUTY) - (MAX_DUTY * temp_min)) / (temp_max - temp_min)));
+
+	return (int) duty;
 }
 
 static int ec_query_cpu_temp(void)
@@ -553,11 +543,18 @@ static int ec_query_fan_rpms(void)
 
 static int ec_write_fan_duty(int duty_percentage)
 {
-	if (duty_percentage < 60 || duty_percentage > 100)
+	if (duty_percentage < MIN_DUTY)
 	{
-		printf("Wrong fan duty to write: %d\n", duty_percentage);
-		return EXIT_FAILURE;
+		printf("Wrong fan duty to write: %d aligning it to %d\n", duty_percentage, MIN_DUTY);
+		duty_percentage = MIN_DUTY;
 	}
+
+	if (duty_percentage > MAX_DUTY)
+	{
+		printf("Wrong fan duty to write: %d aligning it to %d\n", duty_percentage, MAX_DUTY);
+		duty_percentage = MAX_DUTY;
+	}
+
 	double v_d = ((double) duty_percentage) / 100.0 * 255.0;
 	int v_i = (int) v_d;
 	return ec_io_do(0x99, 0x01, v_i);
