@@ -23,6 +23,30 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.exe.debug.1390497268" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.exe.debug">
 								<option id="gnu.cpp.compiler.exe.debug.option.optimization.level.1473089425" name="Optimization Level" superClass="gnu.cpp.compiler.exe.debug.option.optimization.level" value="gnu.cpp.compiler.optimization.level.none" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.exe.debug.option.debugging.level.1758623251" name="Debug Level" superClass="gnu.cpp.compiler.exe.debug.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
+								<option id="gnu.cpp.compiler.option.include.paths.175684797" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="/usr/include/libappindicator3-0.1"/>
+									<listOptionValue builtIn="false" value="/usr/include/libdbusmenu-glib-0.4"/>
+									<listOptionValue builtIn="false" value="/usr/include/gtk-3.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/at-spi2-atk/2.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/at-spi-2.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/dbus-1.0"/>
+									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/dbus-1.0/include"/>
+									<listOptionValue builtIn="false" value="/usr/include/gio-unix-2.0/"/>
+									<listOptionValue builtIn="false" value="/usr/include/mirclient"/>
+									<listOptionValue builtIn="false" value="/usr/include/mircommon"/>
+									<listOptionValue builtIn="false" value="/usr/include/mircookie"/>
+									<listOptionValue builtIn="false" value="/usr/include/cairo"/>
+									<listOptionValue builtIn="false" value="/usr/include/pango-1.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/harfbuzz"/>
+									<listOptionValue builtIn="false" value="/usr/include/atk-1.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/pixman-1"/>
+									<listOptionValue builtIn="false" value="/usr/include/freetype2"/>
+									<listOptionValue builtIn="false" value="/usr/include/libpng12"/>
+									<listOptionValue builtIn="false" value="/usr/include/gdk-pixbuf-2.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
+									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/includ"/>
+								</option>
+								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1438802223" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.compiler.exe.debug.315996596" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.exe.debug">
 								<option defaultValue="gnu.c.optimization.level.none" id="gnu.c.compiler.exe.debug.option.optimization.level.1625806002" name="Optimization Level" superClass="gnu.c.compiler.exe.debug.option.optimization.level" valueType="enumerated"/>
@@ -38,6 +62,7 @@
 									<listOptionValue builtIn="false" value="/usr/include/gio-unix-2.0/"/>
 									<listOptionValue builtIn="false" value="/usr/include/mirclient"/>
 									<listOptionValue builtIn="false" value="/usr/include/mircommon"/>
+									<listOptionValue builtIn="false" value="/usr/include/mircookie"/>
 									<listOptionValue builtIn="false" value="/usr/include/cairo"/>
 									<listOptionValue builtIn="false" value="/usr/include/pango-1.0"/>
 									<listOptionValue builtIn="false" value="/usr/include/harfbuzz"/>
@@ -47,7 +72,7 @@
 									<listOptionValue builtIn="false" value="/usr/include/libpng12"/>
 									<listOptionValue builtIn="false" value="/usr/include/gdk-pixbuf-2.0"/>
 									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
-									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/includ"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1267480048" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -98,7 +123,30 @@
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
 								</inputType>
 							</tool>
-							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.1039429331" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug"/>
+							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.1039429331" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
+								<option id="gnu.cpp.link.option.paths.1981754662" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="../"/>
+								</option>
+								<option id="gnu.cpp.link.option.libs.1896972369" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="appindicator3"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="dbusmenu-glib"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gtk-3"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gdk-3"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="pangocairo-1.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="pango-1.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="atk-1.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="cairo-gobject"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="cairo"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gdk_pixbuf-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gio-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gobject-2.0"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="glib-2.0"/>
+								</option>
+								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.506363351" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
+									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
+									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
+								</inputType>
+							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.assembler.exe.debug.777088438" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.exe.debug">
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.2078468905" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -139,6 +187,7 @@
 						<entry flags="BUILTIN" kind="includePath" name="/usr/include/gio-unix-2.0/"/>
 						<entry flags="BUILTIN" kind="includePath" name="/usr/include/mirclient"/>
 						<entry flags="BUILTIN" kind="includePath" name="/usr/include/mircommon"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/include/mircookie"/>
 						<entry flags="BUILTIN" kind="includePath" name="/usr/include/cairo"/>
 						<entry flags="BUILTIN" kind="includePath" name="/usr/include/pango-1.0"/>
 						<entry flags="BUILTIN" kind="includePath" name="/usr/include/harfbuzz"/>
@@ -148,7 +197,7 @@
 						<entry flags="BUILTIN" kind="includePath" name="/usr/include/libpng12"/>
 						<entry flags="BUILTIN" kind="includePath" name="/usr/include/gdk-pixbuf-2.0"/>
 						<entry flags="BUILTIN" kind="includePath" name="/usr/include/glib-2.0"/>
-						<entry flags="BUILTIN" kind="includePath" name="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+						<entry flags="BUILTIN" kind="includePath" name="/usr/lib/x86_64-linux-gnu/glib-2.0/includ"/>
 					</externalSetting>
 				</externalSettings>
 			</storageModule>
@@ -156,13 +205,7 @@
 		</cconfiguration>
 	</storageModule>
 	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
-		<project id="clevo-indicator.cdt.managedbuild.target.gnu.exe.315421811" name="Executable" projectType="cdt.managedbuild.target.gnu.exe"/>
-	</storageModule>
-	<storageModule moduleId="scannerConfiguration">
-		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.exe.debug.1113043264;cdt.managedbuild.config.gnu.exe.debug.1113043264.;cdt.managedbuild.tool.gnu.c.compiler.exe.debug.315996596;cdt.managedbuild.tool.gnu.c.compiler.input.884563312">
-			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
-		</scannerConfigBuildInfo>
+		<project id="clevo-indicator.null.1019448565" name="clevo-indicator"/>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
 	<storageModule moduleId="refreshScope" versionNumber="2">
@@ -174,4 +217,13 @@
 		<buildTargets/>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
+	<storageModule moduleId="scannerConfiguration">
+		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.exe.debug.1113043264;cdt.managedbuild.config.gnu.exe.debug.1113043264.;cdt.managedbuild.tool.gnu.c.compiler.exe.debug.315996596;cdt.managedbuild.tool.gnu.c.compiler.input.884563312">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.exe.debug.1113043264;cdt.managedbuild.config.gnu.exe.debug.1113043264.;cdt.managedbuild.tool.gnu.cpp.compiler.exe.debug.1390497268;cdt.managedbuild.tool.gnu.cpp.compiler.input.1438802223">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+	</storageModule>
 </cproject>
