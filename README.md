@@ -17,7 +17,7 @@ Build and Install
 
 ```shell
 sudo apt-get install libappindicator3-dev libgtk-3-dev
-git clone git@github.com:AqD/clevo-indicator.git
+git clone https://github.com/SkyLandTW/clevo-indicator.git
 cd clevo-indicator
 make install
 ```
