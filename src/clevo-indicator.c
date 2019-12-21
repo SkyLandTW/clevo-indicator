@@ -69,6 +69,7 @@
 #define EC_REG_GPU_TEMP 0xCD
 #define EC_REG_FAN_DUTY 0xCE
 #define EC_REG_FAN_RPMS_HI 0xD0
+#define EC_REG_GPU_FAN_RPMS_HI 0xD2
 #define EC_REG_FAN_RPMS_LO 0xD1
 
 #define MAX_FAN_RPM 4400.0
@@ -95,6 +96,7 @@ static int ec_query_cpu_temp(void);
 static int ec_query_gpu_temp(void);
 static int ec_query_fan_duty(void);
 static int ec_query_fan_rpms(void);
+static int ec_query_gpu_fan_rpms(void);
 static int ec_write_fan_duty(int duty_percentage);
 static int ec_io_wait(const uint32_t port, const uint32_t flag,
         const char value);
@@ -119,6 +121,7 @@ struct {
 }static menuitems[] = {
         { "Set FAN to AUTO", G_CALLBACK(ui_command_set_fan), 0, AUTO, NULL },
         { "", NULL, 0L, NA, NULL },
+        { "Set FAN to  0%", G_CALLBACK(ui_command_set_fan), 0, MANUAL, NULL },
         { "Set FAN to  60%", G_CALLBACK(ui_command_set_fan), 60, MANUAL, NULL },
         { "Set FAN to  70%", G_CALLBACK(ui_command_set_fan), 70, MANUAL, NULL },
         { "Set FAN to  80%", G_CALLBACK(ui_command_set_fan), 80, MANUAL, NULL },
@@ -134,6 +137,7 @@ struct {
     volatile int exit;
     volatile int cpu_temp;
     volatile int gpu_temp;
+     volatile int gpu_rpms;
     volatile int fan_duty;
     volatile int fan_rpms;
     volatile int auto_duty;
@@ -226,7 +230,7 @@ DO NOT MANIPULATE OR QUERY EC I/O PORTS WHILE THIS PROGRAM IS RUNNING.\n\
             return main_dump_fan();
         } else {
             int val = atoi(argv[1]);
-            if (val < 40 || val > 100)
+            if ( val > 100)
                     {
                 printf("invalid fan duty %d!\n", val);
                 return EXIT_FAILURE;
@@ -234,6 +238,7 @@ DO NOT MANIPULATE OR QUERY EC I/O PORTS WHILE THIS PROGRAM IS RUNNING.\n\
             return main_test_fan(val);
         }
     }
+    
     return EXIT_SUCCESS;
 }
 
@@ -244,6 +249,7 @@ static void main_init_share(void) {
     share_info->exit = 0;
     share_info->cpu_temp = 0;
     share_info->gpu_temp = 0;
+    share_info->gpu_rpms = 0;
     share_info->fan_duty = 0;
     share_info->fan_rpms = 0;
     share_info->auto_duty = 1;
@@ -283,9 +289,9 @@ static int main_ec_worker(void) {
         case 0x100:
             share_info->cpu_temp = buf[EC_REG_CPU_TEMP];
             share_info->gpu_temp = buf[EC_REG_GPU_TEMP];
+            share_info->gpu_rpms = calculate_fan_rpms(buf[EC_REG_GPU_FAN_RPMS_HI],buf[EC_REG_GPU_FAN_RPMS_HI]);
             share_info->fan_duty = calculate_fan_duty(buf[EC_REG_FAN_DUTY]);
-            share_info->fan_rpms = calculate_fan_rpms(buf[EC_REG_FAN_RPMS_HI],
-                    buf[EC_REG_FAN_RPMS_LO]);
+            share_info->fan_rpms = calculate_fan_rpms(buf[EC_REG_FAN_RPMS_HI],buf[EC_REG_FAN_RPMS_LO]);
             /*
              printf("temp=%d, duty=%d, rpms=%d\n", share_info->cpu_temp,
              share_info->fan_duty, share_info->fan_rpms);
@@ -303,6 +309,10 @@ static int main_ec_worker(void) {
                 get_time_string(s_time, 256, "%m/%d %H:%M:%S");
                 printf("%s CPU=%d°C, GPU=%d°C, auto fan duty to %d%%\n", s_time,
                         share_info->cpu_temp, share_info->gpu_temp, next_duty);
+           
+                printf("%d\n",share_info->gpu_rpms);
+
+
                 ec_write_fan_duty(next_duty);
                 share_info->auto_duty_val = next_duty;
             }
@@ -367,6 +377,7 @@ static int main_dump_fan(void) {
     printf("Dump fan information\n");
     printf("  FAN Duty: %d%%\n", ec_query_fan_duty());
     printf("  FAN RPMs: %d RPM\n", ec_query_fan_rpms());
+    printf("  GPU RPMs: %d RPM\n", ec_query_gpu_fan_rpms());
     printf("  CPU Temp: %d°C\n", ec_query_cpu_temp());
     printf("  GPU Temp: %d°C\n", ec_query_gpu_temp());
     return EXIT_SUCCESS;
@@ -498,16 +509,27 @@ static int ec_query_fan_rpms(void) {
     int raw_rpm_lo = ec_io_read(EC_REG_FAN_RPMS_LO);
     return calculate_fan_rpms(raw_rpm_hi, raw_rpm_lo);
 }
+static int ec_query_gpu_fan_rpms(void) {
+    int raw_Grpm_hi = ec_io_read(EC_REG_GPU_FAN_RPMS_HI);
+    int raw_Grpm_lo = ec_io_read(EC_REG_GPU_FAN_RPMS_HI);
+    return calculate_fan_rpms(raw_Grpm_hi, raw_Grpm_lo);
+}
 
 static int ec_write_fan_duty(int duty_percentage) {
-    if (duty_percentage < 60 || duty_percentage > 100) {
+    if (duty_percentage < 0 || duty_percentage > 100) {
         printf("Wrong fan duty to write: %d\n", duty_percentage);
         return EXIT_FAILURE;
     }
     double v_d = ((double) duty_percentage) / 100.0 * 255.0;
     int v_i = (int) v_d;
+    
+    //gpu fan duty
+    ec_io_do(0x99, 0x02, v_i);
+
     return ec_io_do(0x99, 0x01, v_i);
 }
+
+
 
 static int ec_io_wait(const uint32_t port, const uint32_t flag,
         const char value) {
