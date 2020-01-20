@@ -79,16 +79,9 @@ typedef enum {
 
 static void main_init_share(void);
 static int main_ec_worker(void);
-static void main_ui_worker(int argc, char** argv);
-static void main_on_sigchld(int signum);
 static void main_on_sigterm(int signum);
 static int main_dump_fan(void);
 static int main_test_fan(int duty_percentage);
-static gboolean ui_update(gpointer user_data);
-static void ui_command_set_fan(long fan_duty);
-static void ui_command_quit(gchar* command);
-static void ui_toggle_menuitems(int fan_duty);
-static void ec_on_sigterm(int signum);
 static int ec_init(void);
 static int ec_auto_duty_adjust(void);
 static int ec_query_cpu_temp(void);
@@ -106,29 +99,6 @@ static int calculate_fan_rpms(int raw_rpm_high, int raw_rpm_low);
 static int check_proc_instances(const char* proc_name);
 static void get_time_string(char* buffer, size_t max, const char* format);
 static void signal_term(__sighandler_t handler);
-
-static AppIndicator* indicator = NULL;
-
-struct {
-    char label[256];
-    GCallback callback;
-    long option;
-    MenuItemType type;
-    GtkWidget* widget;
-
-}static menuitems[] = {
-        { "Set FAN to AUTO", G_CALLBACK(ui_command_set_fan), 0, AUTO, NULL },
-        { "", NULL, 0L, NA, NULL },
-        { "Set FAN to  60%", G_CALLBACK(ui_command_set_fan), 60, MANUAL, NULL },
-        { "Set FAN to  70%", G_CALLBACK(ui_command_set_fan), 70, MANUAL, NULL },
-        { "Set FAN to  80%", G_CALLBACK(ui_command_set_fan), 80, MANUAL, NULL },
-        { "Set FAN to  90%", G_CALLBACK(ui_command_set_fan), 90, MANUAL, NULL },
-        { "Set FAN to 100%", G_CALLBACK(ui_command_set_fan), 100, MANUAL, NULL },
-        { "", NULL, 0L, NA, NULL },
-        { "Quit", G_CALLBACK(ui_command_quit), 0L, NA, NULL }
-};
-
-static int menuitem_count = (sizeof(menuitems) / sizeof(menuitems[0]));
 
 struct {
     volatile int exit;
@@ -148,18 +118,6 @@ int main(int argc, char* argv[]) {
     printf("Simple fan control utility for Clevo laptops\n");
     if (check_proc_instances(NAME) > 1) {
         printf("Multiple running instances!\n");
-        char* display = getenv("DISPLAY");
-        if (display != NULL && strlen(display) > 0) {
-            int desktop_uid = getuid();
-            setuid(desktop_uid);
-            //
-            gtk_init(&argc, &argv);
-            GtkWidget* dialog = gtk_message_dialog_new(NULL, 0,
-                    GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE,
-                    "Multiple running instances of %s!", NAME);
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-        }
         return EXIT_FAILURE;
     }
     if (ec_init() != EXIT_SUCCESS) {
@@ -167,28 +125,10 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
     if (argc <= 1) {
-        char* display = getenv("DISPLAY");
-        if (display == NULL || strlen(display) == 0) {
-            return main_dump_fan();
-        } else {
-            parent_pid = getpid();
-            main_init_share();
-            signal(SIGCHLD, &main_on_sigchld);
-            signal_term(&main_on_sigterm);
-            pid_t worker_pid = fork();
-            if (worker_pid == 0) {
-                signal(SIGCHLD, SIG_DFL);
-                signal_term(&ec_on_sigterm);
-                return main_ec_worker();
-            } else if (worker_pid > 0) {
-                main_ui_worker(argc, argv);
-                share_info->exit = 1;
-                waitpid(worker_pid, NULL, 0);
-            } else {
-                printf("unable to create worker: %s\n", strerror(errno));
-                return EXIT_FAILURE;
-            }
-        }
+      parent_pid = getpid();
+      main_init_share();
+      signal_term(&main_on_sigterm);
+      main_ec_worker();
     } else {
         if (argv[1][0] == '-') {
             printf(
@@ -314,48 +254,6 @@ static int main_ec_worker(void) {
     return EXIT_SUCCESS;
 }
 
-static void main_ui_worker(int argc, char** argv) {
-    printf("Indicator...\n");
-    int desktop_uid = getuid();
-    setuid(desktop_uid);
-    //
-    gtk_init(&argc, &argv);
-    //
-    GtkWidget* indicator_menu = gtk_menu_new();
-    for (int i = 0; i < menuitem_count; i++) {
-        GtkWidget* item;
-        if (strlen(menuitems[i].label) == 0) {
-            item = gtk_separator_menu_item_new();
-        } else {
-            item = gtk_menu_item_new_with_label(menuitems[i].label);
-            g_signal_connect_swapped(item, "activate",
-                    G_CALLBACK(menuitems[i].callback),
-                    (void* ) menuitems[i].option);
-        }
-        gtk_menu_shell_append(GTK_MENU_SHELL(indicator_menu), item);
-        menuitems[i].widget = item;
-    }
-    gtk_widget_show_all(indicator_menu);
-    //
-    indicator = app_indicator_new(NAME, "brasero",
-            APP_INDICATOR_CATEGORY_HARDWARE);
-    g_assert(IS_APP_INDICATOR(indicator));
-    app_indicator_set_label(indicator, "Init..", "XX");
-    app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ATTENTION);
-    app_indicator_set_ordering_index(indicator, -2);
-    app_indicator_set_title(indicator, "Clevo");
-    app_indicator_set_menu(indicator, GTK_MENU(indicator_menu));
-    g_timeout_add(500, &ui_update, NULL);
-    ui_toggle_menuitems(share_info->fan_duty);
-    gtk_main();
-    printf("main on UI quit\n");
-}
-
-static void main_on_sigchld(int signum) {
-    printf("main on worker quit signal\n");
-    exit(EXIT_SUCCESS);
-}
-
 static void main_on_sigterm(int signum) {
     printf("main on signal: %s\n", strsignal(signum));
     if (share_info != NULL)
@@ -380,65 +278,12 @@ static int main_test_fan(int duty_percentage) {
     return EXIT_SUCCESS;
 }
 
-static gboolean ui_update(gpointer user_data) {
-    char label[256];
-    sprintf(label, "%d℃ %d℃", share_info->cpu_temp, share_info->gpu_temp);
-    app_indicator_set_label(indicator, label, "XXXXXX");
-    char icon_name[256];
-    double load = ((double) share_info->fan_rpms) / MAX_FAN_RPM * 100.0;
-    double load_r = round(load / 5.0) * 5.0;
-    sprintf(icon_name, "brasero-disc-%02d", (int) load_r);
-    app_indicator_set_icon(indicator, icon_name);
-    return G_SOURCE_CONTINUE;
-}
-
-static void ui_command_set_fan(long fan_duty) {
-    int fan_duty_val = (int) fan_duty;
-    if (fan_duty_val == 0) {
-        printf("clicked on fan duty auto\n");
-        share_info->auto_duty = 1;
-        share_info->auto_duty_val = 0;
-        share_info->manual_next_fan_duty = 0;
-    } else {
-        printf("clicked on fan duty: %d\n", fan_duty_val);
-        share_info->auto_duty = 0;
-        share_info->auto_duty_val = 0;
-        share_info->manual_next_fan_duty = fan_duty_val;
-    }
-    ui_toggle_menuitems(fan_duty_val);
-}
-
-static void ui_command_quit(gchar* command) {
-    printf("clicked on quit\n");
-    gtk_main_quit();
-}
-
-static void ui_toggle_menuitems(int fan_duty) {
-    for (int i = 0; i < menuitem_count; i++) {
-        if (menuitems[i].widget == NULL)
-            continue;
-        if (fan_duty == 0)
-            gtk_widget_set_sensitive(menuitems[i].widget,
-                    menuitems[i].type != AUTO);
-        else
-            gtk_widget_set_sensitive(menuitems[i].widget,
-                    menuitems[i].type != MANUAL
-                            || (int) menuitems[i].option != fan_duty);
-    }
-}
-
 static int ec_init(void) {
     if (ioperm(EC_DATA, 1, 1) != 0)
         return EXIT_FAILURE;
     if (ioperm(EC_SC, 1, 1) != 0)
         return EXIT_FAILURE;
     return EXIT_SUCCESS;
-}
-
-static void ec_on_sigterm(int signum) {
-    printf("ec on signal: %s\n", strsignal(signum));
-    if (share_info != NULL)
-        share_info->exit = 1;
 }
 
 static int ec_auto_duty_adjust(void) {
