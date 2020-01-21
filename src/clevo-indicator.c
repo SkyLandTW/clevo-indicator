@@ -71,12 +71,6 @@
 #define EC_REG_FAN_RPMS_HI 0xD0
 #define EC_REG_FAN_RPMS_LO 0xD1
 
-#define MAX_FAN_RPM 4400.0
-
-typedef enum {
-    NA = 0, AUTO = 1, MANUAL = 2
-} MenuItemType;
-
 static void main_init_share(void);
 static int main_ec_worker(void);
 static void main_on_sigterm(int signum);
@@ -125,7 +119,6 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
     if (argc <= 1) {
-      parent_pid = getpid();
       main_init_share();
       signal_term(&main_on_sigterm);
       main_ec_worker();
@@ -196,11 +189,6 @@ static int main_ec_worker(void) {
     setuid(0);
     system("modprobe ec_sys");
     while (share_info->exit == 0) {
-        // check parent
-        if (parent_pid != 0 && kill(parent_pid, 0) == -1) {
-            printf("worker on parent death\n");
-            break;
-        }
         // write EC
         int new_fan_duty = share_info->manual_next_fan_duty;
         if (new_fan_duty != 0
