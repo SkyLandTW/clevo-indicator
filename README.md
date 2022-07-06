@@ -14,7 +14,14 @@ For command-line, use *-h* to display help, or a number representing percentage 
 
 Build and Install
 -----------------
-
+For Ubuntu 22.04:
+```shell
+sudo apt install libayatana-appindicator3-dev libgtk-3-dev
+git clone https://github.com/grizzlei/clevo-indicator.git
+cd clevo-indicator
+make install
+```
+For older Ubuntu versions:
 ```shell
 sudo apt-get install libappindicator3-dev libgtk-3-dev
 git clone https://github.com/SkyLandTW/clevo-indicator.git
