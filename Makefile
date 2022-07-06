@@ -13,8 +13,8 @@ OBJ = $(patsubst %.c,$(OBJDIR)/%.o,$(SRC))
 
 TARGET = bin/clevo-indicator
 
-CFLAGS += `pkg-config --cflags appindicator3-0.1`
-LDFLAGS += `pkg-config --libs appindicator3-0.1`
+CFLAGS += `pkg-config --cflags ayatana-appindicator3-0.1`
+LDFLAGS += `pkg-config --libs ayatana-appindicator3-0.1`
 
 all: $(TARGET)
 
